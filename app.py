@@ -7,6 +7,7 @@ import whisper
 import ASR_functions
 from deep_translator import GoogleTranslator
 import iso639
+os.environ['XDG_RUNTIME_DIR'] = '/tmp/runtime-user'
 
 path_to_video = 'vid.mp4'
 asr_model_downloaded = False
@@ -188,7 +189,7 @@ with gr.Blocks() as demo:
                                         visible=False)
         download_btn = gr.DownloadButton(visible=False)
         tr_btn = gr.Button("Translate")
-        asr_btn.click(fn=make_subtitles, inputs=["aud.wav", prompt, word_timestamps, faster_whisper, device, max_dur]).then(fn=update_ui_asr, outputs=[asr_file_dropdown, download_btn, tr_btn])
+        asr_btn.click(fn=make_subtitles, inputs=[gr.Textbox(value="aud.wav"), prompt, word_timestamps, faster_whisper, device, max_dur]).then(fn=update_ui_asr, outputs=[asr_file_dropdown, download_btn, tr_btn])
         tr_lang = gr.Textbox(label="Enter the language you want to translate the subtitles into")
         lang = ""
         tr_dwnld = gr.DownloadButton(visible=False)
