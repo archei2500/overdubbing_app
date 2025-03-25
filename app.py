@@ -46,7 +46,11 @@ def extract_aud_from_video(upload_method, youtube_url, uploaded_file):
     video.audio.write_audiofile('aud.wav')
 
 
-def make_subtitles(aud_path, prompt, word_timestamps, faster_whisper, device, max_dur):
+def make_subtitles(upload_method, youtube_url, uploaded_file, prompt, word_timestamps, faster_whisper, device, max_dur):
+    aud_path = "aud.wav"
+
+    extract_aud_from_video(upload_method, youtube_url, uploaded_file)
+
     if not asr_model_downloaded:
         if faster_whisper:
             if device == "cpu":
@@ -100,6 +104,60 @@ def make_subtitles(aud_path, prompt, word_timestamps, faster_whisper, device, ma
         print('Вы не загрузили видео. Пожалуйста, вернитесь к ячейке загрузки видео.')
 
 
+# def make_subtitles(aud_path, prompt, word_timestamps, faster_whisper, device, max_dur):
+#     if not asr_model_downloaded:
+#         if faster_whisper:
+#             if device == "cpu":
+#                 compute_type = "int8"
+#             else:
+#                 compute_type = "int8_float16"
+#             model = WhisperModel(model_name, device=device, compute_type=compute_type)
+#         else:
+#             model = whisper.load_model(model_name)
+#
+#     path_to_words = 'words.txt'
+#     if os.path.isfile(aud_path):
+#         # Распознавание речи
+#         if faster_whisper:
+#             segments, info = model.transcribe(aud_path, beam_size=5, initial_prompt=prompt,
+#                                               word_timestamps=word_timestamps)
+#             lang = info.language
+#             ASR_functions.faster_result_to_file(segments, 'result.srt', word_timestamps, path_to_words)
+#         else:
+#             result = model.transcribe(aud_path, initial_prompt=prompt, word_timestamps=word_timestamps)
+#             # temperature=(0.0, 0.2, 0.4, 0.6) # ДОБАВИТЬ ВВОД ТЕМПЕРАТУРЫ
+#             lang = result['language']
+#             ASR_functions.write_result_to_file(result, 'result.srt')
+#
+#         if word_timestamps and not faster_whisper:
+#             ASR_functions.write_words_to_file(result, path_to_words)
+#
+#         if lang == 'ru' or lang == 'en':
+#             ok = ASR_functions.check_punctuation_percent('result.srt', lang, True)
+#             raise gr.Error(f" [!] Вероятно, модель пропустила знаки пунктуации. Рекомендуется перезапустить процесс распознавания.")
+#
+#         # объединение сегментов
+#         word_lines = []
+#         if word_timestamps:
+#             with open(path_to_words, 'r') as wf:
+#                 word_lines = [''] + wf.read().split('\n')
+#
+#         new_lines = ASR_functions.process_text("result.srt", max_dur, word_lines)
+#
+#         txt_file = open('subtitles.srt', "w")
+#         txt_file.write(new_lines[0][1:] + '\n')  # без символа переноса на новую строку
+#         if len(new_lines) > 1:
+#             for line in new_lines[1:-1]:
+#                 txt_file.write(line + '\n')
+#             txt_file.write(new_lines[-1])
+#         txt_file.close()
+#
+#         # корректировка номеров таймингов
+#         ASR_functions.correct_timings("subtitles.srt")
+#     else:
+#         print('Вы не загрузили видео. Пожалуйста, вернитесь к ячейке загрузки видео.')
+
+
 def update_ui_asr(processing_done):
     if processing_done:
         return [
@@ -150,13 +208,7 @@ def update_tr(translate_done, lang):
 
 with gr.Blocks() as demo:
     gr.Markdown("You see two tabs.")
-    with gr.Tab("Automatic Subtitles"):
-        gr.Markdown("### Choose a Whisper model:")
-        faster_whisper = gr.Checkbox(label="Use faster-whisper")
-        model_name = gr.Dropdown(choices=["tiny", "base", "small", "medium", "large-v2", "large-v3", "turbo"],
-                                 label="Size",
-                                 value="tiny")
-        device = gr.Dropdown(choices=["cpu", "cuda"], label="Device", value="cpu")
+    with gr.Tab("## Automatic Subtitles"):
         # Часть с загрузкой видео
         gr.Markdown("### Video uploading")
         upload_method = gr.Dropdown(
@@ -173,24 +225,30 @@ with gr.Blocks() as demo:
             inputs=upload_method,
             outputs=[file_upload, youtube_url]
         )
-        vid_btn = gr.Button("Done")
-        vid_btn.click(fn=extract_aud_from_video, inputs=[upload_method, youtube_url, file_upload])
+        # vid_btn = gr.Button("Done")
+        # vid_btn.click(fn=extract_aud_from_video, inputs=[upload_method, youtube_url, file_upload])
         # Распознавание речи
         gr.Markdown("### Creating the subtitles")
-        prompt = gr.Textbox(label="Prompt")
-        gr.Markdown("# Do you need word timestamps?")
+        gr.Markdown("#### Choose a Whisper model:")
+        faster_whisper = gr.Checkbox(label="Use faster-whisper")
+        model_name = gr.Dropdown(choices=["tiny", "base", "small", "medium", "large-v2", "large-v3", "turbo"],
+                                 label="Size",
+                                 value="tiny")
+        device = gr.Dropdown(choices=["cpu", "cuda"], label="Device", value="cpu")
+        prompt = gr.Textbox(label="Prompt", value="The text below, consisting of segments — separate complete sentences, is a lecture on...")
+        gr.Markdown("Do you need word timestamps?")
         word_timestamps = gr.Checkbox(
             label="word timestamps",
             info="This will most likely ensure that the timestamps in the subtitles are more accurate."
         )
-        asr_btn = gr.Button("Recognize speech")
         max_dur = gr.Textbox(label="Enter the maximum duration (in seconds) of a single phrase in the subtitles")
+        asr_btn = gr.Button("Recognize speech")
         asr_file_dropdown = gr.Dropdown(label="Select the file to download",
                                         choices=["subtitles.srt", "result.srt", "words.txt"],
                                         visible=False)
         download_btn = gr.DownloadButton(visible=False)
         tr_btn = gr.Button("Translate")
-        asr_btn.click(fn=make_subtitles, inputs=[gr.Textbox(value="aud.wav"), prompt, word_timestamps, faster_whisper, device, max_dur]).then(fn=update_ui_asr, outputs=[asr_file_dropdown, download_btn, tr_btn])
+        asr_btn.click(fn=make_subtitles, inputs=[upload_method, youtube_url, file_upload, prompt, word_timestamps, faster_whisper, device, max_dur]).then(fn=update_ui_asr, outputs=[asr_file_dropdown, download_btn, tr_btn])
         tr_lang = gr.Textbox(label="Enter the language you want to translate the subtitles into")
         lang = gr.State("")
         tr_dwnld = gr.DownloadButton(visible=False)
@@ -211,11 +269,11 @@ with gr.Blocks() as demo:
             inputs=[lang, tr_success],
             outputs=[tr_dwnld]
         )
-    with gr.Tab("Video Dubbing"):
+    with gr.Tab("#### Video Dubbing"):
         gr.Markdown("Yeah.")
 
 
-demo.launch()
+demo.launch(share=True, max_file_size=200*1024*1024)
 
 # def flip_text(x):
 #     return x[::-1]
