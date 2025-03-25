@@ -8,6 +8,7 @@ import ASR_functions
 from deep_translator import GoogleTranslator
 import iso639
 os.environ['XDG_RUNTIME_DIR'] = '/tmp/runtime-user'
+os.environ['ALSA_CONFIG_PATH'] = '/dev/null'
 
 path_to_video = 'vid.mp4'
 asr_model_downloaded = False
@@ -191,10 +192,25 @@ with gr.Blocks() as demo:
         tr_btn = gr.Button("Translate")
         asr_btn.click(fn=make_subtitles, inputs=[gr.Textbox(value="aud.wav"), prompt, word_timestamps, faster_whisper, device, max_dur]).then(fn=update_ui_asr, outputs=[asr_file_dropdown, download_btn, tr_btn])
         tr_lang = gr.Textbox(label="Enter the language you want to translate the subtitles into")
-        lang = ""
+        lang = gr.State("")
         tr_dwnld = gr.DownloadButton(visible=False)
-        tr_success = False
-        tr_btn.click(fn=translate, inputs=[tr_lang], outputs=[lang, tr_success]).then(fn=update_tr, inputs=[tr_success, lang], outputs=[tr_dwnld])
+        tr_success = gr.State(False)
+        # tr_btn.click(fn=translate, inputs=[tr_lang], outputs=[lang, tr_success]).then(fn=lambda lang, success: gr.DownloadButton(
+        #     visible=success,
+        #     value=f"subtitles_{lang}.srt" if success else None
+        # ), inputs=[tr_success, lang], outputs=[tr_dwnld])
+        tr_btn.click(
+            fn=translate,
+            inputs=[tr_lang],
+            outputs=[lang, tr_success]
+        ).then(
+            fn=lambda lang, tr_success: gr.DownloadButton(
+                visible=tr_success,
+                value=f"subtitles_{lang}.srt" if tr_success else None
+            ),
+            inputs=[lang, tr_success],
+            outputs=[tr_dwnld]
+        )
     with gr.Tab("Video Dubbing"):
         gr.Markdown("Yeah.")
 
