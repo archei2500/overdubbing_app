@@ -46,7 +46,7 @@ def extract_aud_from_video(upload_method, youtube_url, uploaded_file):
     video.audio.write_audiofile('aud.wav')
 
 
-def make_subtitles(upload_method, youtube_url, uploaded_file, prompt, word_timestamps, faster_whisper, device, max_dur):
+def make_subtitles(upload_method, youtube_url, uploaded_file, prompt, word_timestamps, faster_whisper, device, max_dur, model_name):
     aud_path = "aud.wav"
 
     extract_aud_from_video(upload_method, youtube_url, uploaded_file)
@@ -248,7 +248,7 @@ with gr.Blocks() as demo:
                                         visible=False)
         download_btn = gr.DownloadButton(visible=False)
         tr_btn = gr.Button("Translate")
-        asr_btn.click(fn=make_subtitles, inputs=[upload_method, youtube_url, file_upload, prompt, word_timestamps, faster_whisper, device, max_dur]).then(fn=update_ui_asr, outputs=[asr_file_dropdown, download_btn, tr_btn])
+        asr_btn.click(fn=make_subtitles, inputs=[upload_method, youtube_url, file_upload, prompt, word_timestamps, faster_whisper, device, max_dur, model_name]).then(fn=update_ui_asr, outputs=[asr_file_dropdown, download_btn, tr_btn])
         tr_lang = gr.Textbox(label="Enter the language you want to translate the subtitles into")
         lang = gr.State("")
         tr_dwnld = gr.DownloadButton(visible=False)
