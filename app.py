@@ -23,10 +23,10 @@ def toggle_vid_upload_fields(upload_method):
 
 def extract_aud_from_video(upload_method, youtube_url, uploaded_file):
     # Удаление файлов, если такие уже были в ФС прежде
-    if os.path.isfile(path_to_video):
-        os.remove(path_to_video)
-    if os.path.isfile('aud.wav'):
-        os.remove('aud.wav')
+    # if os.path.isfile(path_to_video):
+    #     os.remove(path_to_video)
+    # if os.path.isfile('aud.wav'):
+    #     os.remove('aud.wav')
 
     if upload_method == "From the device":
         if uploaded_file is not None:
@@ -46,8 +46,9 @@ def extract_aud_from_video(upload_method, youtube_url, uploaded_file):
     video.audio.write_audiofile('aud.wav')
 
 
-def make_subtitles(upload_method, youtube_url, uploaded_file, prompt, word_timestamps, faster_whisper, device, max_dur, model_name):
+def make_subtitles(upload_method, youtube_url, uploaded_file, prompt, word_timestamps, faster_whisper, device, max_dur_str, model_name):
     aud_path = "aud.wav"
+    max_dur = int(max_dur_str)
 
     extract_aud_from_video(upload_method, youtube_url, uploaded_file)
 
@@ -80,7 +81,8 @@ def make_subtitles(upload_method, youtube_url, uploaded_file, prompt, word_times
 
         if lang == 'ru' or lang == 'en':
             ok = ASR_functions.check_punctuation_percent('result.srt', lang, True)
-            raise gr.Error(f" [!] Вероятно, модель пропустила знаки пунктуации. Рекомендуется перезапустить процесс распознавания.")
+            if not ok:
+                raise gr.Error(f" [!] Вероятно, модель пропустила знаки пунктуации. Рекомендуется перезапустить процесс распознавания.")
 
         # объединение сегментов
         word_lines = []
@@ -100,6 +102,7 @@ def make_subtitles(upload_method, youtube_url, uploaded_file, prompt, word_times
 
         # корректировка номеров таймингов
         ASR_functions.correct_timings("subtitles.srt")
+        return "complete"
     else:
         print('Вы не загрузили видео. Пожалуйста, вернитесь к ячейке загрузки видео.')
 
@@ -159,13 +162,17 @@ def make_subtitles(upload_method, youtube_url, uploaded_file, prompt, word_times
 
 
 def update_ui_asr(processing_done):
-    if processing_done:
+    if processing_done == "complete":
         return [
-            gr.Dropdown(visible=True, value="subtitles.srt"),  # Показываем Dropdown
-            gr.DownloadButton(visible=True, value="subtitles.srt"),  # Показываем кнопку с файлом по умолчанию
-            gr.Button(visible=True)
+            # gr.Loader(visible=False),
+            gr.Dropdown(visible=True, value="subtitles.srt"),
+            gr.DownloadButton(visible=True, value="subtitles.srt"),
+            gr.Button(visible=True),
+            gr.Textbox(visible=True),
+            gr.Markdown(visible=False)
         ]
-    return [gr.Dropdown(visible=False), gr.DownloadButton(visible=False), gr.Button(visible=False)]
+    # return [gr.Dropdown(visible=False), gr.DownloadButton(visible=False), gr.Button(visible=False),
+    #         gr.Textbox(visible=False), gr.Markdown(visible=True, value="## Processing... Please wait")]
 
 
 def translate(language):
@@ -208,7 +215,7 @@ def update_tr(translate_done, lang):
 
 with gr.Blocks() as demo:
     gr.Markdown("You see two tabs.")
-    with gr.Tab("## Automatic Subtitles"):
+    with gr.Tab("Automatic Subtitles"):
         # Часть с загрузкой видео
         gr.Markdown("### Video uploading")
         upload_method = gr.Dropdown(
@@ -243,13 +250,29 @@ with gr.Blocks() as demo:
         )
         max_dur = gr.Textbox(label="Enter the maximum duration (in seconds) of a single phrase in the subtitles")
         asr_btn = gr.Button("Recognize speech")
+        status_md = gr.Markdown(visible=False)
+        # processing_load = gr.Loader(visible=False)
         asr_file_dropdown = gr.Dropdown(label="Select the file to download",
                                         choices=["subtitles.srt", "result.srt", "words.txt"],
                                         visible=False)
         download_btn = gr.DownloadButton(visible=False)
-        tr_btn = gr.Button("Translate")
-        asr_btn.click(fn=make_subtitles, inputs=[upload_method, youtube_url, file_upload, prompt, word_timestamps, faster_whisper, device, max_dur, model_name]).then(fn=update_ui_asr, outputs=[asr_file_dropdown, download_btn, tr_btn])
-        tr_lang = gr.Textbox(label="Enter the language you want to translate the subtitles into")
+        tr_lang = gr.Textbox(label="Enter the language you want to translate the subtitles into", visible=False)
+        tr_btn = gr.Button("Translate", visible=False)
+        ASR_status = gr.State("")
+        asr_btn.click(
+            fn=lambda: [gr.Markdown(visible=True, value="## Processing...")],
+            outputs=[status_md]
+        ).then(
+            fn=make_subtitles,
+            inputs=[upload_method, youtube_url, file_upload, prompt, word_timestamps, faster_whisper, device, max_dur,
+                    model_name],
+            outputs=[ASR_status]
+        ).then(
+            fn=update_ui_asr,
+            inputs=[ASR_status],
+            outputs=[asr_file_dropdown, download_btn, tr_btn, tr_lang, status_md]
+        )
+        #asr_btn.click(fn=make_subtitles, inputs=[upload_method, youtube_url, file_upload, prompt, word_timestamps, faster_whisper, device, max_dur, model_name]).then(fn=update_ui_asr, outputs=[asr_file_dropdown, download_btn, tr_btn, tr_lang, status_md])
         lang = gr.State("")
         tr_dwnld = gr.DownloadButton(visible=False)
         tr_success = gr.State(False)
@@ -269,7 +292,7 @@ with gr.Blocks() as demo:
             inputs=[lang, tr_success],
             outputs=[tr_dwnld]
         )
-    with gr.Tab("#### Video Dubbing"):
+    with gr.Tab("Video Dubbing"):
         gr.Markdown("Yeah.")
 
 
