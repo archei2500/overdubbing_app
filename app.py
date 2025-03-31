@@ -1,6 +1,7 @@
 import gradio as gr
 import os
 import ASR_main_functions as amf
+import TTS_main_functions as tmf
 os.environ['XDG_RUNTIME_DIR'] = '/tmp/runtime-user'
 os.environ['ALSA_CONFIG_PATH'] = '/dev/null'
 
@@ -66,6 +67,32 @@ with gr.Blocks() as demo:
                 tr_success = gr.State(False)
     with gr.Tab("Video Dubbing"):
         gr.Markdown("Yeah.")
+    with gr.Tab("Testing TTS"):
+        with gr.Row():
+            with gr.Column():
+                gr.Markdown("### <center>Recommendations")
+                gr.Markdown("#### <center>Fill in the fields below and you will be offered suitable speech synthesis options.")
+                rec_TTS_lang = gr.Textbox(label="Enter the language (in English) in which the synthesis will be performed:")
+                test_clone = gr.Checkbox(label="Are you going to clone the voice? (to enhance the similarity with the original)")
+                rec_gender = gr.Dropdown(choices=["male", "female"],
+                                          label="Which voice gender is preferable?",
+                                          value="male")
+                test_emotions = gr.Checkbox(label="Do you need to add emotion to the voice?")
+                recommend_btn = gr.Button("Get recommendations")
+                recommend_textbox = gr.Textbox(label="Your recommendations", interactive=False, visible=False)
+            with gr.Column():
+                gr.Markdown("### <center>Voice testing")
+                # добавить к нему обработчик изменения, чтобы показывал варианты Silero
+                test_tool = gr.Dropdown(label="Select a synthesizer for testing:",
+                                        choices=["gTTS", "Microsoft Edge TTS", "Silero Models"],
+                                        value="gTTS")
+                silero_txt = gr.Markdown("...", visible=False)
+                test_TTS_lang = gr.Textbox(label="Enter the language (for gTTS and Silero Models), in English:")
+                test_voice_name = gr.Textbox(label="Enter voice (for Microsoft Edge TTS and Silero Models):")
+                test_gender = gr.Dropdown(choices=["male", "female"],
+                                          label="Select the voice gender (for some Silero languages)",
+                                          value="male")
+                test_text = gr.Textbox(label="Enter the test text:")
     # Отслеживает изменения в выборе метода загрузки видео и подгружает соответствующее поле
     upload_method.change(
         fn=toggle_vid_upload_fields,
@@ -108,6 +135,20 @@ with gr.Blocks() as demo:
         )],
         inputs=[lang, tr_success],
         outputs=[tr_dwnld, tr_content_display]
+    )
+
+    # нажатие кнопки "Получить рекомендации"
+    recommend_btn.click(
+        fn=tmf.recommend_TTS,
+        inputs=[rec_TTS_lang, test_clone, rec_gender, test_emotions],
+        outputs=recommend_textbox
+    )
+
+    # изменение выбранного инструмента при тестировании
+    test_tool.change(
+        fn=lambda selected_tool: gr.Markdown(visible=selected_tool == "Silero Models"),
+        inputs=test_tool,
+        outputs=silero_txt
     )
 
 
