@@ -112,6 +112,11 @@ def make_subtitles(upload_method, youtube_url, uploaded_file, prompt, word_times
         print('Вы не загрузили видео. Пожалуйста, вернитесь к ячейке загрузки видео.')
 
 
+def read_file(filepath):
+    with open(filepath, 'r', encoding='utf-8') as f:
+        return f.read()
+
+
 # def make_subtitles(aud_path, prompt, word_timestamps, faster_whisper, device, max_dur):
 #     if not asr_model_downloaded:
 #         if faster_whisper:
@@ -175,7 +180,8 @@ def update_ui_asr(processing_done):
             gr.DownloadButton(visible=True, value="subtitles.srt"),
             gr.Button(visible=True),
             gr.Textbox(visible=True),
-            gr.Textbox(visible=True)
+            gr.Textbox(visible=True),
+            gr.Textbox(read_file("subtitles.srt"), visible=True)
         ]
     # return [gr.Dropdown(visible=False), gr.DownloadButton(visible=False), gr.Button(visible=False),
     #         gr.Textbox(visible=False), gr.Markdown(visible=True, value="## Processing... Please wait")]
@@ -220,7 +226,6 @@ def update_tr(translate_done, lang):
 
 
 with gr.Blocks() as demo:
-    gr.Markdown("You see two tabs.")
     with gr.Tab("Automatic Subtitles"):
         # Часть с загрузкой видео
         gr.Markdown("### Video uploading")
@@ -261,10 +266,11 @@ with gr.Blocks() as demo:
         asr_file_dropdown = gr.Dropdown(label="Select the file to download",
                                         choices=["subtitles.srt", "result.srt", "words.txt"],
                                         visible=False)
+        ASR_content_display = gr.Textbox(label="File content", interactive=False, visible=False)
         download_btn = gr.DownloadButton(visible=False)
         tr_lang = gr.Textbox(label="Enter the language you want to translate the subtitles into", visible=False)
         tr_btn = gr.Button("Translate", visible=False)
-        tr_progress_textbox = gr.Textbox(label="Progress", visible=False)
+        tr_progress_textbox = gr.Textbox(label="Please wait...", visible=False, interactive=False)
         ASR_status = gr.State("")
 
         asr_btn.click(
@@ -276,17 +282,24 @@ with gr.Blocks() as demo:
         ).then(
             fn=update_ui_asr,
             inputs=[ASR_status],
-            outputs=[asr_file_dropdown, download_btn, tr_btn, tr_lang, tr_progress_textbox]
+            outputs=[asr_file_dropdown, download_btn, tr_btn, tr_lang, tr_progress_textbox, ASR_content_display]
         )
 
         asr_file_dropdown.change(
-            fn=lambda selected_file: gr.DownloadButton(value=selected_file),
+            fn=lambda selected_file: [gr.DownloadButton(value=selected_file), read_file(selected_file)],
             inputs=asr_file_dropdown,
-            outputs=download_btn
+            outputs=[download_btn, ASR_content_display]
         )
+
+        # asr_file_dropdown.change(
+        #     fn=display_and_download,
+        #     inputs=asr_file_dropdown,
+        #     outputs=[download_btn, ASR_content_display]
+        # )
 
         #asr_btn.click(fn=make_subtitles, inputs=[upload_method, youtube_url, file_upload, prompt, word_timestamps, faster_whisper, device, max_dur, model_name]).then(fn=update_ui_asr, outputs=[asr_file_dropdown, download_btn, tr_btn, tr_lang, status_md])
         lang = gr.State("")
+        tr_content_display = gr.Textbox(label="File content", visible=False, interactive=False)
         tr_dwnld = gr.DownloadButton(visible=False)
         tr_success = gr.State(False)
         # tr_btn.click(fn=translate, inputs=[tr_lang], outputs=[lang, tr_success]).then(fn=lambda lang, success: gr.DownloadButton(
@@ -296,15 +309,21 @@ with gr.Blocks() as demo:
         tr_btn.click(
             fn=translate,
             inputs=[tr_lang],
-            outputs=[lang, tr_success, tr_progress_textbox],
-            show_progress=True
+            outputs=[lang, tr_success, tr_progress_textbox]
+            # show_progress=True
         ).then(
-            fn=lambda lang, tr_success: gr.DownloadButton(
+            fn=lambda lang, tr_success: [gr.DownloadButton(
                 visible=tr_success,
                 value=f"subtitles_{lang}.srt" if tr_success else None
             ),
+            gr.Textbox(
+                read_file(f"subtitles_{lang}.srt"),
+                visible=tr_success
+            )
+            # read_file(f"subtitles_{lang}.srt")
+            ],
             inputs=[lang, tr_success],
-            outputs=[tr_dwnld]
+            outputs=[tr_dwnld, tr_content_display]
         )
     with gr.Tab("Video Dubbing"):
         gr.Markdown("Yeah.")
