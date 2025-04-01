@@ -22,7 +22,8 @@ def update_uploads(cg_1, cg_2):
             gr.File(visible="Synthesized speech fragments (zip)" in cg_2),
             gr.File(visible="Video fragments (zip)" in cg_2),
             gr.Checkbox(visible="Clone sample (audio prompt)" not in cg_1),
-            gr.Checkbox(visible="Prompt transcription" not in cg_1)]
+            gr.Checkbox(visible="Prompt transcription" not in cg_1),
+            gr.Checkbox(visible="Clone sample (audio prompt)" in cg_1)]
 
 
 with gr.Blocks() as demo:
@@ -89,26 +90,28 @@ with gr.Blocks() as demo:
                     "4. For some models, you may need to have transcription of the audio sample (or audio prompt). This can also be done using ASR - just select the option below then.\n"
                     "5. The choice for advanced users is to download synthesized fragments and video fragments after their generation to continue working.")
         with gr.Row():
-            srt_upload = gr.File(
-                label="Download SRT file from your computer",
-                visible=False,
-                file_types=[".srt", ".txt"]
-            )
-            prompt_upload = gr.File(
-                label="Download audio prompt from your computer",
-                visible=False,
-                file_types=[".wav", ".mp3"]
-            )
-            prompt_tr_upload = gr.File(
-                label="Download prompt decryption (txt) from your computer",
-                visible=False,
-                file_types=[".txt"]
-            )
+            srt_upload = gr.File(label="Download SRT file from your computer", visible=False)
+            prompt_upload = gr.File(label="Download audio prompt from your computer", visible=False)
+            prompt_tr_upload = gr.File(label="Download prompt decryption (txt) from your computer", visible=False)
         with gr.Row():
             speech_fragms_upload = gr.File(label="Download speech fragments", visible=False, file_types=[".zip"])
             vid_fragms_upload = gr.File(label="Download video fragments", visible=False, file_types=[".zip"])
+        cut_prompt = gr.Checkbox(label="Do you want to trim the prompt?", visible=False)
         extract_prompt = gr.Checkbox(label="Extract audio prompt from the video?", visible=False)
         ASR_prompt_tr = gr.Checkbox(label="Transcribe prompt with ASR model?", visible=False)
+        with gr.Row():
+            with gr.Column():
+                prompt_from_vid = gr.Markdown("#### <center>Video --> prompt extraction")
+                cut_prompt_md = gr.Markdown("#### <center>Prompt cropping")
+                cut_vid_prompt = gr.Markdown("Enter the beginning and end of the interval in the <minutes>:<seconds> format or 0 if you do not specify one or both boundaries:",
+                                             visible=False)
+                start_prompt = gr.Textbox(visible=False)
+                end_prompt = gr.Textbox(visible=False)
+                cut_done = gr.Button("Done", visible=False)
+                cut_prompt_display = gr.Audio("Result", visible=False)
+            with gr.Column():
+                prompt_tr_btn = gr.Button("Transcribe prompt")
+                prompt_tr_display = gr.Textbox("Your transciption")
     with gr.Tab("Testing TTS"):
         with gr.Row():
             with gr.Column():
@@ -186,9 +189,26 @@ with gr.Blocks() as demo:
         fn=update_uploads,
         inputs=[loadings, advanced_loadings],
         outputs=[load_markdown, srt_upload, prompt_upload, prompt_tr_upload, speech_fragms_upload, vid_fragms_upload,
-                 extract_prompt, ASR_prompt_tr]
+                 extract_prompt, ASR_prompt_tr, cut_prompt]
     )
 
+    # cut_prompt.change(
+    #     fn=lambda x: [gr.Markdown(visible=x), gr.Markdown(visible=x), gr.Textbox(visible=x), gr.Textbox(visible=x),
+    #                   gr.Button(visible=x), gr.Audio(visible=x)],
+    #     inputs=cut_prompt,
+    #     outputs=[cut_prompt_md, cut_vid_prompt, start_prompt, end_prompt, cut_done, cut_prompt_display]
+    # )
+    # prompt_from_vid = gr.Markdown("#### <center>Video --> prompt extraction")
+    # cut_prompt_md = gr.Markdown("#### <center>Prompt cropping")
+    # cut_vid_prompt = gr.Markdown(
+    #     "Enter the beginning and end of the interval in the <minutes>:<seconds> format or 0 if you do not specify one or both boundaries:",
+    #     visible=False)
+    # start_prompt = gr.Textbox(visible=False)
+    # end_prompt = gr.Textbox(visible=False)
+    # cut_done = gr.Button("Done", visible=False)
+    # cut_prompt_display = gr.Audio("Result", visible=False)
+
+    #3
     # нажатие кнопки "Получить рекомендации"
     recommend_btn.click(
         fn=tmf.recommend_TTS,
