@@ -16,6 +16,15 @@ def toggle_vid_upload_fields(upload_method):
     ]
 
 
+def update_uploads(cg_1, cg_2):
+    return [gr.Markdown(visible=False), gr.File(visible="Subtitles" in cg_1),
+            gr.File(visible="Clone sample (audio prompt)" in cg_1), gr.File(visible="Prompt transcription" in cg_1),
+            gr.File(visible="Synthesized speech fragments (zip)" in cg_2),
+            gr.File(visible="Video fragments (zip)" in cg_2),
+            gr.Checkbox(visible="Clone sample (audio prompt)" not in cg_1),
+            gr.Checkbox(visible="Prompt transcription" not in cg_1)]
+
+
 with gr.Blocks() as demo:
     with gr.Tab("Automatic Subtitles"):
         # Часть с загрузкой видео
@@ -66,7 +75,40 @@ with gr.Blocks() as demo:
                 tr_dwnld = gr.DownloadButton(visible=False)
                 tr_success = gr.State(False)
     with gr.Tab("Video Dubbing"):
-        gr.Markdown("Yeah.")
+        gr.Markdown("### <center>Files uploading")
+        loadings = gr.CheckboxGroup(
+            label="Choose what you will upload:",
+            choices=["Subtitles", "Clone sample (audio prompt)", "Prompt transcription"])
+        advanced_loadings = gr.CheckboxGroup(
+            label="Advanced",
+            choices=["Synthesized speech fragments (zip)", "Video fragments (zip)"])
+        load_choice_done = gr.Button("Let's download!")
+        load_markdown = gr.Markdown("1. Upload the video in the previous tab, if it hasn't been uploaded yet.\n"
+                    "2. You can download a new file with subtitles, or the system will automatically search for a file from the previous tab.\n"
+                    "3. Clone sample - optional. If you do not choose to download it, you can also choose below to extract a fragment from the video for this purpose.\n"
+                    "4. For some models, you may need to have transcription of the audio sample (or audio prompt). This can also be done using ASR - just select the option below then.\n"
+                    "5. The choice for advanced users is to download synthesized fragments and video fragments after their generation to continue working.")
+        with gr.Row():
+            srt_upload = gr.File(
+                label="Download SRT file from your computer",
+                visible=False,
+                file_types=[".srt", ".txt"]
+            )
+            prompt_upload = gr.File(
+                label="Download audio prompt from your computer",
+                visible=False,
+                file_types=[".wav", ".mp3"]
+            )
+            prompt_tr_upload = gr.File(
+                label="Download prompt decryption (txt) from your computer",
+                visible=False,
+                file_types=[".txt"]
+            )
+        with gr.Row():
+            speech_fragms_upload = gr.File(label="Download speech fragments", visible=False, file_types=[".zip"])
+            vid_fragms_upload = gr.File(label="Download video fragments", visible=False, file_types=[".zip"])
+        extract_prompt = gr.Checkbox(label="Extract audio prompt from the video?", visible=False)
+        ASR_prompt_tr = gr.Checkbox(label="Transcribe prompt with ASR model?", visible=False)
     with gr.Tab("Testing TTS"):
         with gr.Row():
             with gr.Column():
@@ -93,6 +135,7 @@ with gr.Blocks() as demo:
                                           label="Select the voice gender (for some Silero languages)",
                                           value="male")
                 test_text = gr.Textbox(label="Enter the test text:")
+    # 1
     # Отслеживает изменения в выборе метода загрузки видео и подгружает соответствующее поле
     upload_method.change(
         fn=toggle_vid_upload_fields,
@@ -135,6 +178,15 @@ with gr.Blocks() as demo:
         )],
         inputs=[lang, tr_success],
         outputs=[tr_dwnld, tr_content_display]
+    )
+
+    #2
+    # нажатие кнопки выбора, что загружать
+    load_choice_done.click(
+        fn=update_uploads,
+        inputs=[loadings, advanced_loadings],
+        outputs=[load_markdown, srt_upload, prompt_upload, prompt_tr_upload, speech_fragms_upload, vid_fragms_upload,
+                 extract_prompt, ASR_prompt_tr]
     )
 
     # нажатие кнопки "Получить рекомендации"

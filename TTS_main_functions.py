@@ -7,7 +7,7 @@ import iso639
 import gradio as gr
 
 
-def recommend_TTS(language, cloning, gender, emotions):
+async def recommend_TTS(language, cloning, gender, emotions):
     selected = False
     output_text = []
 
@@ -90,7 +90,10 @@ def recommend_TTS(language, cloning, gender, emotions):
         gender_edge = 'Male' if gender == 'male' else 'Female'
         if not TTS_functions.vm_crtd:
             vm = await VoicesManager.create()
+            TTS_functions.vm = vm
             TTS_functions.vm_crtd = True
+        else:
+            vm = TTS_functions.vm
         if cloning:
             voices = vm.find(Language=lang_code)
             if voices:
@@ -120,27 +123,26 @@ def recommend_TTS(language, cloning, gender, emotions):
             else:
                 output_text.append('Silero Models might be suitable for you.')
                 selected = True
+        language = language.lower()
         # Проверка Fish-Speech
-        if cloning:
-            if language in TTS_functions.fish_languages:
-                if selected:
-                    output_text.append(
-                        'Also consider the Fish-Speech model, which clones the voice well and synthesizes high-quality speech.')
-                else:
-                    output_text.append(
-                        'The Fish-Speech model may be suitable for you. It clones the voice well and synthesizes high-quality speech.')
-                    selected = True
+        if language in TTS_functions.fish_languages and cloning:
+            if selected:
                 output_text.append(
-                    'The recommended loading time is 30 seconds (no less than 10 and no more than 90).')
+                    'Also consider the Fish-Speech model, which clones the voice well and synthesizes high-quality speech.')
+            else:
+                output_text.append(
+                    'The Fish-Speech model may be suitable for you. It clones the voice well and synthesizes high-quality speech.')
+                selected = True
+            output_text.append(
+                'The recommended loading time is 30 seconds (no less than 10 and no more than 90).')
         # Проверка F5-TTS
-        if cloning:
-            if language in ['english', 'chinese']:
-                if selected:
-                    output_text.append('Also consider the F5-TTS model, which clones the voice well and synthesizes high-quality speech.')
-                else:
-                    output_text.append('The F5-TTS may be suitable for you - the model clones the voice well and synthesizes high-quality speech.')
-                    selected = True
-                output_text.append('The recommended loading time is no more than 12 seconds.')
+        if language in ['english', 'chinese'] and cloning:
+            if selected:
+                output_text.append('Also consider the F5-TTS model, which clones the voice well and synthesizes high-quality speech.')
+            else:
+                output_text.append('The F5-TTS may be suitable for you - the model clones the voice well and synthesizes high-quality speech.')
+                selected = True
+            output_text.append('The recommended loading time is no more than 12 seconds.')
         if not selected:
             output_text.append('Unfortunately, there are no models with the requested parameters.')
 

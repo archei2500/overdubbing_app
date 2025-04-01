@@ -6,3 +6,6 @@ moviepy
 yt-dlp
 deep-translator
 iso639
+gTTS
+edge-tts
+asyncio
