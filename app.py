@@ -17,13 +17,17 @@ def toggle_vid_upload_fields(upload_method):
 
 
 def update_uploads(cg_1, cg_2):
-    return [gr.Markdown(visible=False), gr.File(visible="Subtitles" in cg_1),
-            gr.File(visible="Clone sample (audio prompt)" in cg_1), gr.File(visible="Prompt transcription" in cg_1),
-            gr.File(visible="Synthesized speech fragments (zip)" in cg_2),
-            gr.File(visible="Video fragments (zip)" in cg_2),
-            gr.Checkbox(visible="Clone sample (audio prompt)" not in cg_1),
-            gr.Checkbox(visible="Prompt transcription" not in cg_1),
-            gr.Checkbox(visible="Clone sample (audio prompt)" in cg_1)]
+    return [gr.Markdown(visible=False), gr.File(visible="Subtitles" in cg_1, interactive="Subtitles" in cg_1),
+            gr.File(visible="Clone sample (audio prompt)" in cg_1, interactive="Clone sample (audio prompt)" in cg_1),
+            gr.File(visible="Prompt transcription" in cg_1, interactive="Prompt transcription" in cg_1),
+            gr.File(visible="Synthesized speech fragments (zip)" in cg_2,
+                    interactive="Synthesized speech fragments (zip)" in cg_2),
+            gr.File(visible="Video fragments (zip)" in cg_2, interactive="Video fragments (zip)" in cg_2),
+            gr.Checkbox(visible="Clone sample (audio prompt)" not in cg_1,
+                        interactive="Clone sample (audio prompt)" not in cg_1),
+            gr.Checkbox(visible="Prompt transcription" not in cg_1, interactive="Prompt transcription" not in cg_1),
+            gr.Checkbox(visible="Clone sample (audio prompt)" in cg_1,
+                        interactive="Clone sample (audio prompt)" in cg_1)]
 
 
 with gr.Blocks() as demo:
@@ -90,9 +94,12 @@ with gr.Blocks() as demo:
                     "4. For some models, you may need to have transcription of the audio sample (or audio prompt). This can also be done using ASR - just select the option below then.\n"
                     "5. The choice for advanced users is to download synthesized fragments and video fragments after their generation to continue working.")
         with gr.Row():
-            srt_upload = gr.File(label="Download SRT file from your computer", visible=False)
-            prompt_upload = gr.File(label="Download audio prompt from your computer", visible=False)
-            prompt_tr_upload = gr.File(label="Download prompt decryption (txt) from your computer", visible=False)
+            srt_upload = gr.File(label="Download SRT file from your computer", visible=False,
+                                 file_types=[".srt", ".txt"])
+            prompt_upload = gr.File(label="Download audio prompt from your computer", visible=False,
+                                    file_types=[".wav", ".mp3"])
+            prompt_tr_upload = gr.File(label="Download prompt transcription (txt) from your computer", visible=False,
+                                       file_types=[".txt"])
         with gr.Row():
             speech_fragms_upload = gr.File(label="Download speech fragments", visible=False, file_types=[".zip"])
             vid_fragms_upload = gr.File(label="Download video fragments", visible=False, file_types=[".zip"])
@@ -101,17 +108,53 @@ with gr.Blocks() as demo:
         ASR_prompt_tr = gr.Checkbox(label="Transcribe prompt with ASR model?", visible=False)
         with gr.Row():
             with gr.Column():
-                prompt_from_vid = gr.Markdown("#### <center>Video --> prompt extraction")
-                cut_prompt_md = gr.Markdown("#### <center>Prompt cropping")
+                prompt_from_vid = gr.Markdown("#### <center>Video --> prompt extraction", visible=False)
+                cut_prompt_md = gr.Markdown("#### <center>Prompt cropping", visible=False)
                 cut_vid_prompt = gr.Markdown("Enter the beginning and end of the interval in the <minutes>:<seconds> format or 0 if you do not specify one or both boundaries:",
                                              visible=False)
-                start_prompt = gr.Textbox(visible=False)
-                end_prompt = gr.Textbox(visible=False)
-                cut_done = gr.Button("Done", visible=False)
+                start_prompt = gr.Textbox(visible=False, value="0")
+                end_prompt = gr.Textbox(visible=False, value="0")
+                cut_done = gr.Button("Let's do it", visible=False)
                 cut_prompt_display = gr.Audio("Result", visible=False)
             with gr.Column():
-                prompt_tr_btn = gr.Button("Transcribe prompt")
-                prompt_tr_display = gr.Textbox("Your transciption")
+                prompt_tr_btn = gr.Button("Transcribe prompt", visible=False)
+                prompt_tr_display = gr.Textbox("Your transciption", visible=False)
+        gr.Markdown("#### <center>Speech synthesis settings")
+        with gr.Row():
+            with gr.Column():
+                tts_tool = gr.Dropdown(choices=["Yandex SpeechKit", "Coqui TTS", "gTTS", "Microsoft Edge TTS",
+                                                "Silero Models", "Fish Audio", "F5-TTS"],
+                                       label="Choose a synthesis tool",
+                                       value="Coqui TTS")
+                tts_lang = gr.Textbox(label="Enter the language (in English) in which the synthesis will be performed:")
+                # tts_cloning = gr.Checkbox(label="") # пока не будем делать раздел с клонированием - проблемно
+                tts_gender = gr.Dropdown(choices=["male", "female"],
+                                         label="Which voice gender is preferable?",
+                                         value="male",
+                                         visible=False) # внимание - надо будет сделать видимым и interactive, если будет загружен промпт
+                speed_str = gr.Textbox(label="Do you need to slow down or speed up synthesized phrases right away?"
+                                             "Enter 1 if not necessary, and speed if necessary.", value="1")
+            with gr.Column():
+                tts_voice = gr.Textbox(label="Enter voice name", visible=False)
+                tts_role = gr.Textbox(label="Voice role (or not if the model hasn't roles)", value="not", visible=False)
+                tts_model = gr.Dropdown(label="Select a model (for Coqui TTS)",
+                                        choices=["xtts_v2", "tacotron2-DDC_ph (only english)"],
+                                        value="xtts_v2",
+                                        visible=False
+                                        )
+                API_key_yandex = gr.Textbox(label="Yandex API key", visible=False)
+                speech_zip_dwld = gr.DownloadButton(label="Download zip with speech", visible=False)
+        with gr.Row():
+            with gr.Column():
+                gr.Markdown("#### <center>Resulting video settings")
+                vid_mode = gr.Dropdown(label="Select mode",
+                                       choices=["Simple audio overlay by timings", "Stretch/narrow video to fit phrases (takes a lot of time)"],
+                                       value="Simple audio overlay by timings")
+                slow_aud = gr.Checkbox(label="Slow down phrases to better match initial pronunciation time?", visible=False)
+                limit = gr.Checkbox(label="Limit deceleration/acceleration? (for both options)"
+                                          "This is necessary so that there is not too much difference between the speeds of phrases or video clips in the final video, if the synthesized phrase is much longer/shorter than the original one.")
+                dwnld_raw_video = gr.DownloadButton(label="Download raw video (without lip sync)", visible=False)
+            # here lip sync will be
     with gr.Tab("Testing TTS"):
         with gr.Row():
             with gr.Column():
@@ -192,21 +235,41 @@ with gr.Blocks() as demo:
                  extract_prompt, ASR_prompt_tr, cut_prompt]
     )
 
-    # cut_prompt.change(
-    #     fn=lambda x: [gr.Markdown(visible=x), gr.Markdown(visible=x), gr.Textbox(visible=x), gr.Textbox(visible=x),
-    #                   gr.Button(visible=x), gr.Audio(visible=x)],
-    #     inputs=cut_prompt,
-    #     outputs=[cut_prompt_md, cut_vid_prompt, start_prompt, end_prompt, cut_done, cut_prompt_display]
-    # )
-    # prompt_from_vid = gr.Markdown("#### <center>Video --> prompt extraction")
-    # cut_prompt_md = gr.Markdown("#### <center>Prompt cropping")
+    # надо обрезать загруженный промпт - показываются элементы интерфейса
+    cut_prompt.change(
+        fn=lambda x: [gr.Markdown(visible=x), gr.Markdown(visible=x), gr.Textbox(visible=x), gr.Textbox(visible=x),
+                      gr.Button(visible=x), gr.Audio(visible=x)],
+        inputs=cut_prompt,
+        outputs=[cut_prompt_md, cut_vid_prompt, start_prompt, end_prompt, cut_done, cut_prompt_display]
+    )
+
+    # надо извлечь промпт из видео - показываются элементы интерфейса
+    extract_prompt.change(
+        fn=lambda x: [gr.Markdown(visible=x), gr.Markdown(visible=x), gr.Textbox(visible=x), gr.Textbox(visible=x),
+                      gr.Button(visible=x), gr.Audio(visible=x)],
+        inputs=extract_prompt,
+        outputs=[prompt_from_vid, cut_vid_prompt, start_prompt, end_prompt, cut_done, cut_prompt_display]
+    )
+
+    # надо распознать речь из промпта - показываются элементы интерфейса
+    ASR_prompt_tr.change(
+        fn=lambda x: [gr.Button(visible=True), gr.Textbox(visible=True)],
+        inputs=ASR_prompt_tr,
+        outputs=[prompt_tr_btn, prompt_tr_display]
+    )
+
+    # cut_done.click()
+
+    # prompt_from_vid = gr.Markdown("#### <center>Video --> prompt extraction", visible=False)
+    # cut_prompt_md = gr.Markdown("#### <center>Prompt cropping", visible=False)
     # cut_vid_prompt = gr.Markdown(
     #     "Enter the beginning and end of the interval in the <minutes>:<seconds> format or 0 if you do not specify one or both boundaries:",
     #     visible=False)
-    # start_prompt = gr.Textbox(visible=False)
-    # end_prompt = gr.Textbox(visible=False)
-    # cut_done = gr.Button("Done", visible=False)
+    # start_prompt = gr.Textbox(visible=False, value="0")
+    # end_prompt = gr.Textbox(visible=False, value="0")
+    # cut_done = gr.Button("Let's do it", visible=False)
     # cut_prompt_display = gr.Audio("Result", visible=False)
+
 
     #3
     # нажатие кнопки "Получить рекомендации"

@@ -7,6 +7,20 @@ import iso639
 import gradio as gr
 
 
+def crop_aud(clone_sample, start_str, end_str):
+    if start_str != '0':
+        ok_s, start = TTS_functions.form_boundary(start_str, clone_sample)  # формирование времени начала в секундах
+    else:
+        start = 0
+        ok_s = True
+    if end_str != '0':
+        ok_e, end = form_boundary(end_str, clone_sample)  # формирование времени окончания в секундах
+    else:
+        end = 0
+        ok_e = True
+# ДОДЕЛАТЬ
+
+
 async def recommend_TTS(language, cloning, gender, emotions):
     selected = False
     output_text = []

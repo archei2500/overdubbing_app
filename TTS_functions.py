@@ -1,3 +1,41 @@
+# from moviepy.editor import VideoFileClip, AudioFileClip, concatenate_videoclips
+# from moviepy.video.fx.accel_decel import accel_decel
+# import re
+# from IPython.display import clear_output, Audio, display
+from pydub import AudioSegment
+
+
+# import os
+# from google.colab import files
+# import subprocess
+# import ffmpeg
+# import torch
+# import locale # для восстановления кодировки
+# import iso639 # для кодов языков
+# import cv2
+
+def form_boundary(time, clone_path):
+    ok = True
+    pos = time.find(':')
+    if pos != -1:
+        buf = time[: pos]
+        if not (len(buf) > 0 and len(buf) < 3 and buf.isdigit() and int(buf) >= 0):
+            ok = False
+        buf = time[pos + 1:]
+        if not (len(buf) > 0 and len(buf) < 3 and buf.isdigit() and int(buf) >= 0):
+            ok = False
+        if ok:
+            buf = int(time[: pos]) * 60 + int(time[pos + 1:])
+            dur = len(AudioSegment.from_file(clone_path))
+            if buf > dur:  # если больше продолжительности видео
+                ok = False
+                print("Введённое вами время превышает продолжительность аудиофайла!")
+    else:
+        ok = False
+
+    return ok, buf
+
+
 # times = [] # для корректировки субтитров в конце
 #
 #
@@ -107,29 +145,6 @@
 #       os.remove(vid_path)
 #       video.write_videofile(vid_path, threads = 4)
 #
-#
-# def form_boundary(time, clone_path):
-#   ok = True
-#   pos = time.find(':')
-#   if pos != -1:
-#     buf = time[: pos]
-#     if not (len(buf) > 0 and len(buf) < 3 and buf.isdigit() and int(buf) >= 0):
-#       ok = False
-#     buf = time[pos + 1 :]
-#     if not (len(buf) > 0 and len(buf) < 3 and buf.isdigit() and int(buf) >= 0):
-#       ok = False
-#     if ok:
-#       buf = int(time[: pos]) * 60 + int(time[pos + 1 :])
-#       dur = len(AudioSegment.from_file(clone_path))
-#       if buf > dur: # если больше продолжительности видео
-#         ok = False
-#         print("Введённое вами время превышает продолжительность аудиофайла!")
-#   else:
-#     ok = False
-#
-#   return ok, buf
-#
-#
 # def choice_silero_model(lang, gender='female'):
 #   ver = '3-4'
 #   voice = None # для тех языков, где нет выбора голосов
@@ -238,28 +253,29 @@ clone_text = '/content/clone.txt'
 path_to_init = '/content/synthesized1'
 path_to_synth = '/content/synthesized'
 
-yandex_languages = {'german' : [{'name': 'lea', 'gender' : 'female', 'roles' : []}],
-                    'english' : [{'name': 'john', 'gender' : 'male', 'roles' : []}],
-                    'hebrew' : [{'name': 'naomi', 'gender' : 'female', 'roles' : ['modern', 'classic']}],
-                    'kazakh' : [{'name': 'amira', 'gender' : 'female', 'roles' : []},
-                                  {'name': 'madi', 'gender' : 'male', 'roles' : []}],
-                    'russian' : [{'name': 'alena', 'gender' : 'female', 'roles' : ['neutral', 'good']},
-                                  {'name': 'filipp', 'gender' : 'male', 'roles' : []},
-                                  {'name': 'ermil', 'gender' : 'male', 'roles' : ['neutral', 'good']},
-                                  {'name': 'jane', 'gender' : 'female', 'roles' : ['neutral', 'good', 'evil']},
-                                  {'name': 'madirus', 'gender' : 'male', 'roles' : []},
-                                  {'name': 'omazh', 'gender' : 'female', 'roles' : ['neutral', 'evil']},
-                                  {'name': 'zahar', 'gender' : 'male', 'roles' : ['neutral', 'good']},
-                                  {'name': 'dasha', 'gender' : 'female', 'roles' : ['neutral', 'good', 'friendly']},
-                                  {'name': 'julia', 'gender' : 'female', 'roles' : ['neutral', 'strict']},
-                                  {'name': 'lera', 'gender' : 'female', 'roles' : ['neutral', 'friendly']},
-                                  {'name': 'marina', 'gender' : 'female', 'roles' : ['neutral', 'whisper', 'strict']},
-                                  {'name': 'alexander', 'gender' : 'male', 'roles' : ['neutral', 'good']},
-                                  {'name': 'kirill', 'gender' : 'male', 'roles' : ['neutral', 'strict', 'good']},
-                                  {'name': 'anton', 'gender' : 'male', 'roles' : ['neutral', 'good']}],
-                    'uzbek' : [{'name': 'nigora', 'gender' : 'female', 'roles' : []}]
+yandex_languages = {'german': [{'name': 'lea', 'gender': 'female', 'roles': []}],
+                    'english': [{'name': 'john', 'gender': 'male', 'roles': []}],
+                    'hebrew': [{'name': 'naomi', 'gender': 'female', 'roles': ['modern', 'classic']}],
+                    'kazakh': [{'name': 'amira', 'gender': 'female', 'roles': []},
+                               {'name': 'madi', 'gender': 'male', 'roles': []}],
+                    'russian': [{'name': 'alena', 'gender': 'female', 'roles': ['neutral', 'good']},
+                                {'name': 'filipp', 'gender': 'male', 'roles': []},
+                                {'name': 'ermil', 'gender': 'male', 'roles': ['neutral', 'good']},
+                                {'name': 'jane', 'gender': 'female', 'roles': ['neutral', 'good', 'evil']},
+                                {'name': 'madirus', 'gender': 'male', 'roles': []},
+                                {'name': 'omazh', 'gender': 'female', 'roles': ['neutral', 'evil']},
+                                {'name': 'zahar', 'gender': 'male', 'roles': ['neutral', 'good']},
+                                {'name': 'dasha', 'gender': 'female', 'roles': ['neutral', 'good', 'friendly']},
+                                {'name': 'julia', 'gender': 'female', 'roles': ['neutral', 'strict']},
+                                {'name': 'lera', 'gender': 'female', 'roles': ['neutral', 'friendly']},
+                                {'name': 'marina', 'gender': 'female', 'roles': ['neutral', 'whisper', 'strict']},
+                                {'name': 'alexander', 'gender': 'male', 'roles': ['neutral', 'good']},
+                                {'name': 'kirill', 'gender': 'male', 'roles': ['neutral', 'strict', 'good']},
+                                {'name': 'anton', 'gender': 'male', 'roles': ['neutral', 'good']}],
+                    'uzbek': [{'name': 'nigora', 'gender': 'female', 'roles': []}]
                     }
-xtts_languages = ['english', 'spanish', 'french', 'german', 'italian', 'portuguese', 'polish', 'turkish', 'russian', 'dutch', 'czech', 'arabic', 'chinese', 'japanese', 'hungarian', 'korean']
+xtts_languages = ['english', 'spanish', 'french', 'german', 'italian', 'portuguese', 'polish', 'turkish', 'russian',
+                  'dutch', 'czech', 'arabic', 'chinese', 'japanese', 'hungarian', 'korean']
 silero_languages = ['Russian', 'Ukrainian', 'Uzbek', 'Avar', 'Bashkir', 'Bulgarian', 'Chechen',
                     'Chuvash', 'Erzya', 'Kalmyk', 'Karachay-Balkar', 'Kazakh', 'Khakas',
                     'Komi-Ziryan', 'Lezghian', 'Mari', 'Mari High', 'Nogai', 'Ossetic', 'Tatar',
