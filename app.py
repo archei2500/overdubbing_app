@@ -1,6 +1,7 @@
 import gradio as gr
 import os
 import ASR_main_functions as amf
+import TTS_functions as tf
 import TTS_main_functions as tmf
 os.environ['XDG_RUNTIME_DIR'] = '/tmp/runtime-user'
 os.environ['ALSA_CONFIG_PATH'] = '/dev/null'
@@ -24,10 +25,14 @@ def update_uploads(cg_1, cg_2):
                     interactive="Synthesized speech fragments (zip)" in cg_2),
             gr.File(visible="Video fragments (zip)" in cg_2, interactive="Video fragments (zip)" in cg_2),
             gr.Checkbox(visible="Clone sample (audio prompt)" not in cg_1,
-                        interactive="Clone sample (audio prompt)" not in cg_1),
-            gr.Checkbox(visible="Prompt transcription" not in cg_1, interactive="Prompt transcription" not in cg_1),
+                        interactive="Clone sample (audio prompt)" not in cg_1,
+                        value=False),
+            gr.Checkbox(visible="Prompt transcription" not in cg_1, interactive="Prompt transcription" not in cg_1, value=False),
             gr.Checkbox(visible="Clone sample (audio prompt)" in cg_1,
-                        interactive="Clone sample (audio prompt)" in cg_1)]
+                        interactive="Clone sample (audio prompt)" in cg_1,
+                        value=False)
+            #gr.Dropdown(visible="Clone sample (audio prompt)" in cg_1, interactive="Clone sample (audio prompt)" in cg_1)
+            ]
 
 
 with gr.Blocks() as demo:
@@ -112,13 +117,14 @@ with gr.Blocks() as demo:
                 cut_prompt_md = gr.Markdown("#### <center>Prompt cropping", visible=False)
                 cut_vid_prompt = gr.Markdown("Enter the beginning and end of the interval in the <minutes>:<seconds> format or 0 if you do not specify one or both boundaries:",
                                              visible=False)
-                start_prompt = gr.Textbox(visible=False, value="0")
-                end_prompt = gr.Textbox(visible=False, value="0")
+                start_prompt = gr.Textbox(label="start", visible=False, value="0")
+                end_prompt = gr.Textbox(label="end", visible=False, value="0")
                 cut_done = gr.Button("Let's do it", visible=False)
-                cut_prompt_display = gr.Audio("Result", visible=False)
+                cut_prompt_display = gr.Audio("Result", visible=False, interactive=False)
+                cut_prompt_dwnld = gr.DownloadButton("Download prompt", visible=False)
             with gr.Column():
                 prompt_tr_btn = gr.Button("Transcribe prompt", visible=False)
-                prompt_tr_display = gr.Textbox("Your transciption", visible=False)
+                prompt_tr_display = gr.Textbox(label="Your transciption", visible=False)
         gr.Markdown("#### <center>Speech synthesis settings")
         with gr.Row():
             with gr.Column():
@@ -232,43 +238,82 @@ with gr.Blocks() as demo:
         fn=update_uploads,
         inputs=[loadings, advanced_loadings],
         outputs=[load_markdown, srt_upload, prompt_upload, prompt_tr_upload, speech_fragms_upload, vid_fragms_upload,
-                 extract_prompt, ASR_prompt_tr, cut_prompt]
+                 extract_prompt, ASR_prompt_tr, cut_prompt] #tts_gender
     )
 
     # надо обрезать загруженный промпт - показываются элементы интерфейса
     cut_prompt.change(
-        fn=lambda x: [gr.Markdown(visible=x), gr.Markdown(visible=x), gr.Textbox(visible=x), gr.Textbox(visible=x),
+        fn=lambda x: [gr.Markdown(visible=x), gr.Markdown(visible=False), gr.Markdown(visible=x), gr.Textbox(visible=x), gr.Textbox(visible=x),
                       gr.Button(visible=x), gr.Audio(visible=x)],
         inputs=cut_prompt,
-        outputs=[cut_prompt_md, cut_vid_prompt, start_prompt, end_prompt, cut_done, cut_prompt_display]
+        outputs=[cut_prompt_md, prompt_from_vid, cut_vid_prompt, start_prompt, end_prompt, cut_done, cut_prompt_display]
     )
 
     # надо извлечь промпт из видео - показываются элементы интерфейса
     extract_prompt.change(
-        fn=lambda x: [gr.Markdown(visible=x), gr.Markdown(visible=x), gr.Textbox(visible=x), gr.Textbox(visible=x),
+        fn=lambda x: [gr.Markdown(visible=x), gr.Markdown(visible=False), gr.Markdown(visible=x), gr.Textbox(visible=x), gr.Textbox(visible=x),
                       gr.Button(visible=x), gr.Audio(visible=x)],
         inputs=extract_prompt,
-        outputs=[prompt_from_vid, cut_vid_prompt, start_prompt, end_prompt, cut_done, cut_prompt_display]
+        outputs=[prompt_from_vid, cut_prompt_md, cut_vid_prompt, start_prompt, end_prompt, cut_done, cut_prompt_display]
     )
 
     # надо распознать речь из промпта - показываются элементы интерфейса
     ASR_prompt_tr.change(
-        fn=lambda x: [gr.Button(visible=True), gr.Textbox(visible=True)],
+        fn=lambda x: [gr.Button(visible=x), gr.Textbox(visible=x)],
         inputs=ASR_prompt_tr,
         outputs=[prompt_tr_btn, prompt_tr_display]
     )
 
-    # cut_done.click()
+    # и извлечение промпта из видео, и его обезка
+    cut_done.click(
+        fn=tmf.process_cut,
+        inputs=[file_upload, extract_prompt, prompt_upload, start_prompt, end_prompt],
+        outputs=[cut_prompt_display, cut_prompt_dwnld]
+    )
 
-    # prompt_from_vid = gr.Markdown("#### <center>Video --> prompt extraction", visible=False)
-    # cut_prompt_md = gr.Markdown("#### <center>Prompt cropping", visible=False)
-    # cut_vid_prompt = gr.Markdown(
-    #     "Enter the beginning and end of the interval in the <minutes>:<seconds> format or 0 if you do not specify one or both boundaries:",
-    #     visible=False)
-    # start_prompt = gr.Textbox(visible=False, value="0")
-    # end_prompt = gr.Textbox(visible=False, value="0")
-    # cut_done = gr.Button("Let's do it", visible=False)
-    # cut_prompt_display = gr.Audio("Result", visible=False)
+    # автоматическая расшифровка промпта
+    prompt_tr_btn.click(
+        fn=tmf.transcribe_prompt,
+        inputs=[extract_prompt, cut_prompt, prompt_upload],
+        outputs=prompt_tr_display
+    )
+
+    # СИНТЕЗ РЕЧИ
+    # видимости
+    tts_tool.change(
+        fn=lambda tool: [gr.Dropdown(visible=tool in ["Yandex SpeechKit", "Microsoft Edge TTS", "Silero Models"],
+                                     interactive=tool in ["Yandex SpeechKit", "Microsoft Edge TTS", "Silero Models"]),
+                         gr.Textbox(visible=tool in ["Yandex SpeechKit", "Microsoft Edge TTS", "Silero Models"]),
+                         gr.Textbox(visible=tool=="Yandex SpeechKit"),
+                         gr.Dropdown(visible=tool=="Coqui TTS", interactive=tool=="Coqui TTS"),
+                         gr.Textbox(visible=tool=="Yandex SpeechKit")],
+        inputs=tts_tool,
+        outputs=[tts_gender, tts_voice, tts_role, tts_model, API_key_yandex]
+    )
+
+    # with gr.Column():
+    #     tts_tool = gr.Dropdown(choices=["Yandex SpeechKit", "Coqui TTS", "gTTS", "Microsoft Edge TTS",
+    #                                     "Silero Models", "Fish Audio", "F5-TTS"],
+    #                            label="Choose a synthesis tool",
+    #                            value="Coqui TTS")
+    #     tts_lang = gr.Textbox(label="Enter the language (in English) in which the synthesis will be performed:")
+    #     # tts_cloning = gr.Checkbox(label="") # пока не будем делать раздел с клонированием - проблемно
+    #     tts_gender = gr.Dropdown(choices=["male", "female"],
+    #                              label="Which voice gender is preferable?",
+    #                              value="male",
+    #                              visible=False)  # внимание - надо будет сделать видимым и interactive, если будет загружен промпт
+    #     speed_str = gr.Textbox(label="Do you need to slow down or speed up synthesized phrases right away?"
+    #                                  "Enter 1 if not necessary, and speed if necessary.", value="1")
+    # with gr.Column():
+    #     tts_voice = gr.Textbox(label="Enter voice name", visible=False)
+    #     tts_role = gr.Textbox(label="Voice role (or not if the model hasn't roles)", value="not", visible=False)
+    #     tts_model = gr.Dropdown(label="Select a model (for Coqui TTS)",
+    #                             choices=["xtts_v2", "tacotron2-DDC_ph (only english)"],
+    #                             value="xtts_v2",
+    #                             visible=False
+    #                             )
+    #     API_key_yandex = gr.Textbox(label="Yandex API key", visible=False)
+    #     speech_zip_dwld = gr.DownloadButton(label="Download zip with speech", visible=False)
 
 
     #3

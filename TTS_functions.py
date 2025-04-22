@@ -246,12 +246,12 @@ f5_installed = False
 vm_crtd = False
 vm = None
 
-path_to_text = '/content/subtitles.srt'
-path_to_video = '/content/vid.mp4'
-clone_sample = '/content/clone_voice.wav'
-clone_text = '/content/clone.txt'
-path_to_init = '/content/synthesized1'
-path_to_synth = '/content/synthesized'
+path_to_text = 'subtitles.srt'
+path_to_video = 'vid.mp4'
+clone_sample = 'clone_voice.wav'
+clone_text = 'clone.txt'
+path_to_init = 'synthesized1'
+path_to_synth = 'synthesized'
 
 yandex_languages = {'german': [{'name': 'lea', 'gender': 'female', 'roles': []}],
                     'english': [{'name': 'john', 'gender': 'male', 'roles': []}],
