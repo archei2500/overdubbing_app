@@ -97,7 +97,8 @@ with gr.Blocks() as demo:
                     "2. You can download a new file with subtitles, or the system will automatically search for a file from the previous tab.\n"
                     "3. Clone sample - optional. If you do not choose to download it, you can also choose below to extract a fragment from the video for this purpose.\n"
                     "4. For some models, you may need to have transcription of the audio sample (or audio prompt). This can also be done using ASR - just select the option below then.\n"
-                    "5. The choice for advanced users is to download synthesized fragments and video fragments after their generation to continue working.")
+                    "5. The choice for advanced users is to download synthesized fragments and video fragments after their generation to continue working.\n"
+                    "6. If you start with the lip sync step, you need to upload the modified video (on the last tab) and subtitles (here at the top).")
         with gr.Row():
             srt_upload = gr.File(label="Download SRT file from your computer", visible=False,
                                  file_types=[".srt", ".txt"])
@@ -131,7 +132,7 @@ with gr.Blocks() as demo:
                 tts_tool = gr.Dropdown(choices=["Yandex SpeechKit", "Coqui TTS", "gTTS", "Microsoft Edge TTS",
                                                 "Silero Models", "Fish Audio", "F5-TTS"],
                                        label="Choose a synthesis tool",
-                                       value="Coqui TTS")
+                                       value="gTTS")
                 tts_lang = gr.Textbox(label="Enter the language (in English) in which the synthesis will be performed:")
                 # tts_cloning = gr.Checkbox(label="") # пока не будем делать раздел с клонированием - проблемно
                 tts_gender = gr.Dropdown(choices=["male", "female"],
@@ -156,11 +157,43 @@ with gr.Blocks() as demo:
                 vid_mode = gr.Dropdown(label="Select mode",
                                        choices=["Simple audio overlay by timings", "Stretch/narrow video to fit phrases (takes a lot of time)"],
                                        value="Simple audio overlay by timings")
-                slow_aud = gr.Checkbox(label="Slow down phrases to better match initial pronunciation time?", visible=False)
+                slow_aud = gr.Checkbox(label="Slow down phrases to better match initial pronunciation time?",
+                                       interactive=True) # делаем false, когда убирают первый вариант
                 limit = gr.Checkbox(label="Limit deceleration/acceleration? (for both options)"
                                           "This is necessary so that there is not too much difference between the speeds of phrases or video clips in the final video, if the synthesized phrase is much longer/shorter than the original one.")
+                do_lip_sync = gr.Checkbox(label="do lip sync")
                 dwnld_raw_video = gr.DownloadButton(label="Download raw video (without lip sync)", visible=False)
-            # here lip sync will be
+                dwnld_new_subs = gr.DownloadButton(label="Download changed subtitles", visible=False)
+            with gr.Column():
+                lip_sync_md = gr.Markdown("#### <center>Lip sync settings", visible=False)
+                gfpgan = gr.Checkbox(label="Improve the video quality after processing", visible=False)
+                # субтитры могли быть изменены, если выбирали измненение продолжительности фрагментов видео, так что
+                # оно в таком случае должно их искать, либо если с лип синка начали, то ответственность на юзере
+                opt_fragms = gr.Checkbox(label="Perform lip sync only on specific timings", visible=False)
+                # должно появиться поле после выбора
+                timings_str = gr.Textbox(label="Enter numbers separated by a space", visible=False)
+                lip_tool = gr.Dropdown(label="Choose model for lip sync",
+                                       choices=["Wav2Lip", "Wav2Lip + GAN"],
+                                       value="Wav2Lip",
+                                       visible=False)
+                with gr.Column():
+                    lip_sync_md2 = gr.Markdown("Setting the frame around the mouth. This is how the indents are adjusted. You can use the chin area, for example, by setting pad bottom = 20.", visible=False)
+                    pad_top = gr.Textbox(label="pad top", visible=False)
+                    with gr.Row():
+                        pad_left = gr.Textbox(label="pad left", visible=False)
+                        pad_right = gr.Textbox(label="pad right", visible=False)
+                    pad_bottom = gr.Textbox(label="pad bottom", visible=False)
+                nosmooth = gr.Checkbox(label="nosmooth (To avoid excessive smoothing of the face images)",
+                                       value=True,
+                                       visible=False)
+        do_dubbing = gr.Button("START")
+        final_btn = gr.DownloadButton("DOWNLOAD RESULT", visible=False)
+        # позже снесём это вниз
+        # do_dubbing.click(
+        #     fn=tmf.dummy_func,
+        #     inputs=[],
+        #     outputs=[]
+        # )
     with gr.Tab("Testing TTS"):
         with gr.Row():
             with gr.Column():
@@ -284,37 +317,37 @@ with gr.Blocks() as demo:
         fn=lambda tool: [gr.Dropdown(visible=tool in ["Yandex SpeechKit", "Microsoft Edge TTS", "Silero Models"],
                                      interactive=tool in ["Yandex SpeechKit", "Microsoft Edge TTS", "Silero Models"]),
                          gr.Textbox(visible=tool in ["Yandex SpeechKit", "Microsoft Edge TTS", "Silero Models"]),
-                         gr.Textbox(visible=tool=="Yandex SpeechKit"),
-                         gr.Dropdown(visible=tool=="Coqui TTS", interactive=tool=="Coqui TTS"),
-                         gr.Textbox(visible=tool=="Yandex SpeechKit")],
+                         gr.Textbox(visible=tool == "Yandex SpeechKit"),
+                         gr.Dropdown(visible=tool == "Coqui TTS", interactive=tool == "Coqui TTS"),
+                         gr.Textbox(visible=tool == "Yandex SpeechKit")],
         inputs=tts_tool,
         outputs=[tts_gender, tts_voice, tts_role, tts_model, API_key_yandex]
     )
 
-    # with gr.Column():
-    #     tts_tool = gr.Dropdown(choices=["Yandex SpeechKit", "Coqui TTS", "gTTS", "Microsoft Edge TTS",
-    #                                     "Silero Models", "Fish Audio", "F5-TTS"],
-    #                            label="Choose a synthesis tool",
-    #                            value="Coqui TTS")
-    #     tts_lang = gr.Textbox(label="Enter the language (in English) in which the synthesis will be performed:")
-    #     # tts_cloning = gr.Checkbox(label="") # пока не будем делать раздел с клонированием - проблемно
-    #     tts_gender = gr.Dropdown(choices=["male", "female"],
-    #                              label="Which voice gender is preferable?",
-    #                              value="male",
-    #                              visible=False)  # внимание - надо будет сделать видимым и interactive, если будет загружен промпт
-    #     speed_str = gr.Textbox(label="Do you need to slow down or speed up synthesized phrases right away?"
-    #                                  "Enter 1 if not necessary, and speed if necessary.", value="1")
-    # with gr.Column():
-    #     tts_voice = gr.Textbox(label="Enter voice name", visible=False)
-    #     tts_role = gr.Textbox(label="Voice role (or not if the model hasn't roles)", value="not", visible=False)
-    #     tts_model = gr.Dropdown(label="Select a model (for Coqui TTS)",
-    #                             choices=["xtts_v2", "tacotron2-DDC_ph (only english)"],
-    #                             value="xtts_v2",
-    #                             visible=False
-    #                             )
-    #     API_key_yandex = gr.Textbox(label="Yandex API key", visible=False)
-    #     speech_zip_dwld = gr.DownloadButton(label="Download zip with speech", visible=False)
+    # ДУБЛЯЖ
+    # видимость
+    vid_mode.change(
+        fn=lambda mode: gr.Checkbox(visible=mode == "Simple audio overlay by timings", interactive=True),
+        inputs=vid_mode,
+        outputs=slow_aud
+    )
 
+    do_lip_sync.change(
+        fn=lambda x: [gr.Markdown(visible=x), gr.Checkbox(visible=x, interactive=x), gr.Checkbox(visible=x),
+                      gr.Dropdown(visible=x, interactive=x), gr.Markdown(visible=x),
+                      gr.Textbox(visible=x, interactive=x), gr.Textbox(visible=x, interactive=x),
+                      gr.Textbox(visible=x, interactive=x), gr.Textbox(visible=x, interactive=x),
+                      gr.Checkbox(visible=x, interactive=x)],
+        inputs=do_lip_sync,
+        outputs=[lip_sync_md, gfpgan, opt_fragms, lip_tool, lip_sync_md2, pad_top, pad_left, pad_right, pad_bottom,
+                 nosmooth]
+    )
+
+    opt_fragms.change(
+        fn=lambda x: gr.Textbox(visible=x, interactive=x),
+        inputs=opt_fragms,
+        outputs=timings_str
+    )
 
     #3
     # нажатие кнопки "Получить рекомендации"

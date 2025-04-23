@@ -1,14 +1,15 @@
 # from moviepy.editor import VideoFileClip, AudioFileClip, concatenate_videoclips
 # from moviepy.video.fx.accel_decel import accel_decel
-# import re
+import re
 # from IPython.display import clear_output, Audio, display
 from pydub import AudioSegment
+from speechkit import model_repository
 
 
-# import os
+import os
 # from google.colab import files
-# import subprocess
-# import ffmpeg
+import subprocess
+import ffmpeg
 # import torch
 # import locale # для восстановления кодировки
 # import iso639 # для кодов языков
@@ -34,6 +35,49 @@ def form_boundary(time, clone_path):
         ok = False
 
     return ok, buf
+
+
+# Проверка на то, что файл имеет необходимую структуру
+def check_txtfile(filename):
+    txtfile = open(filename, "r", encoding="utf-8")
+    lines = [''] + txtfile.read().split('\n')
+    txtfile.close()
+    ok = True
+    if (len(lines) % 4 == 0):
+        for i in range(0, len(lines), 4):
+            if lines[i]:
+                ok = False
+            if not re.match(r'^\d+$', lines[i + 1]):
+                ok = False
+            if not re.match(r'\d{2}:\d{2}:\d{2},\d{3} --> \d{2}:\d{2}:\d{2},\d{3}', lines[i + 2]):
+                ok = False
+            if not lines[i + 3]:
+                ok = False
+    else:
+        ok = False
+    return ok
+
+
+# Функция синтеза для Yandex-Speechkit
+def synthesize(text, export_path, voice=None, role=None):
+    model = model_repository.synthesis_model()
+
+    # настройки синтеза
+    model.voice = voice
+    model.role = role
+
+    # синтез речи и создание аудио с результатом
+    result = model.synthesize(text, raw_format=False)
+    result.export(export_path, 'wav')
+
+
+def speedup(path, speed):
+    filter = "atempo=" + str(speed)
+    command = "ffmpeg -i " + path + " -filter:a " + filter + " /content/changed.wav"
+    process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    output, error = process.communicate()
+    os.remove(path)
+    os.rename("/content/changed.wav", path)
 
 
 # times = [] # для корректировки субтитров в конце
@@ -67,13 +111,6 @@ def form_boundary(time, clone_path):
 #   audio.export(aud_path, format = "wav")
 #
 #
-# def speedup(path, speed):
-#   filter = "atempo=" + str(speed)
-#   command = "ffmpeg -i " + path + " -filter:a " + filter + " /content/changed.wav"
-#   process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-#   output, error = process.communicate()
-#   os.remove(path)
-#   os.rename("/content/changed.wav", path)
 #
 #
 # def check_duration(old_path, aud_path, start, end, slow_aud, limit):
@@ -186,40 +223,6 @@ def form_boundary(time, clone_path):
 #     model_id = 'cyrillic'
 #
 #   return model_id, voice, ver
-#
-#
-# # Функция синтеза для Yandex-Speechkit
-# def synthesize(text, export_path, voice, role):
-#   model = model_repository.synthesis_model()
-#
-#   # настройки синтеза
-#   model.voice = voice
-#   model.role = role
-#
-#   # синтез речи и создание аудио с результатом
-#   result = model.synthesize(text, raw_format = False)
-#   result.export(export_path, 'wav')
-#
-#
-# # Проверка на то, что файл имеет необходимую структуру
-# def check_txtfile(filename):
-#   txtfile = open(filename, "r", encoding = "utf-8")
-#   lines = [''] + txtfile.read().split('\n')
-#   txtfile.close()
-#   ok = True
-#   if (len(lines) % 4 == 0):
-#     for i in range(0, len(lines), 4):
-#       if lines[i]:
-#         ok = False
-#       if not re.match(r'^\d+$', lines[i + 1]):
-#         ok = False
-#       if not re.match(r'\d{2}:\d{2}:\d{2},\d{3} --> \d{2}:\d{2}:\d{2},\d{3}', lines[i + 2]):
-#         ok = False
-#       if not lines[i + 3]:
-#         ok = False
-#   else:
-#     ok = False
-#   return ok
 #
 #
 # def silero_save(audio, path, sample_rate):

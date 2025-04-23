@@ -9,3 +9,6 @@ iso639
 gTTS
 edge-tts
 asyncio
+torch
+ffmpeg-python
+yandex-speechkit

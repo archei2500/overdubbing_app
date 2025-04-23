@@ -9,6 +9,9 @@ from pydub import AudioSegment
 from moviepy.editor import VideoFileClip # AudioFileClip, concatenate_videoclips
 import os
 from faster_whisper import WhisperModel
+import shutil
+import torch
+from speechkit import configure_credentials, creds
 
 
 def crop_aud(clone, start_str, end_str):
@@ -85,6 +88,64 @@ def transcribe_prompt(extract_from_vid, cut_prompt, clone=None, progress=gr.Prog
             os.remove(tf.clone_sample)
         os.rename(clone, tf.clone_sample)
     return gr.Textbox(value=txt_massive)
+
+
+def speech_synthesis(tool, language, speed_str, device, voice, role, API_key, lines):
+    language = language.lower()
+    lang_capital = language[0].upper() + language[1:]
+    try:
+        speed = float(speed_str)
+        if speed <= 0:
+            raise gr.Error("Speed cannot be a negative value!")
+    except ValueError:
+        raise gr.Error("You entered an incorrect speed value!")
+
+    if os.path.exists(tf.path_to_init):
+        shutil.rmtree(tf.path_to_init)
+        os.makedirs(tf.path_to_init)
+    else:
+        os.makedirs(tf.path_to_init, exist_ok=True)
+
+    # ЕСЛИ ВЫБРАЛИ YANDEX
+    if tool == "Yandex-Speechkit":
+        # Проверки входных данных
+        if language not in tf.yandex_languages:
+            raise gr.Error('This language is not supported by Yandex SpeechKit!')
+        if voice not in [item['name'] for item in tf.yandex_languages[language]]:
+            raise gr.Error('There is no such voice in Yandex SpeechKit!')
+        if not API_key:
+            raise gr.Error('Для синтеза речи с помощью Yandex SpeechKit необходим ключ API!')
+        # Аутентификация через API-ключ.
+        configure_credentials(yandex_credentials=creds.YandexCredentials(api_key=API_key))
+        # синтез речи с помощью Yandex SpeechKit
+        for i in range(0, len(lines), 4):
+            export_path = tf.path_to_init + '/' + str(int(i / 4)) + '.wav'
+            tf.synthesize(lines[i + 3], export_path, voice, role)  # синтез фразы
+            if speed != 1:
+                tf.speedup(export_path, speed)
+
+
+# ОСНОВНАЯ ФУНКЦИЯ ДЛЯ ДУБЛЯЖА
+def video_dubbing(tts_tool, language, speed, srt_uploaded):
+    if language and language.isalpha():
+        if os.path.isfile(srt_uploaded):
+            if srt_uploaded != tf.path_to_text:
+                os.rename(srt_uploaded, tf.path_to_text)
+        else:
+            if os.path.isfile("subtitles_" + iso639.to_iso639_1(language[0].upper() + language[1:])):
+                os.rename("subtitles_" + iso639.to_iso639_1(language[0].upper() + language[1:]), tf.path_to_text)
+            elif not os.path.isfile(tf.path_to_text):
+                raise gr.Error("You haven't uploaded a text file!")
+        if tf.check_txtfile(tf.path_to_text):
+            # считываем из файла строки
+            txtfile = open(tf.path_to_text, 'r', encoding='utf-8')
+            lines = [''] + txtfile.read().split('\n')
+            txtfile.close()
+        else:
+            raise gr.Error('Incorrect structure of the selected file!')
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    else:
+        raise gr.Error("Please enter the speech synthesis language correctly!")
 
 
 async def recommend_TTS(language, cloning, gender, emotions):
