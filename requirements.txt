@@ -8,7 +8,13 @@ deep-translator
 iso639
 gTTS
 edge-tts
-asyncio
-torch
 ffmpeg-python
 yandex-speechkit
+coqui-tts
+torchaudio
+omegaconf
+git+https://github.com/fishaudio/fish-speech.git
+torch==2.4.1
+torchvision==0.19.1
+torchaudio==2.4.1
+f5-tts

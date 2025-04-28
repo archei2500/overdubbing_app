@@ -3,6 +3,8 @@ import os
 import ASR_main_functions as amf
 import TTS_functions as tf
 import TTS_main_functions as tmf
+import iso639
+import torch
 os.environ['XDG_RUNTIME_DIR'] = '/tmp/runtime-user'
 os.environ['ALSA_CONFIG_PATH'] = '/dev/null'
 
@@ -133,7 +135,10 @@ with gr.Blocks() as demo:
                                                 "Silero Models", "Fish Audio", "F5-TTS"],
                                        label="Choose a synthesis tool",
                                        value="gTTS")
-                tts_lang = gr.Textbox(label="Enter the language (in English) in which the synthesis will be performed:")
+                tts_lang = gr.Textbox(label="Enter the language (in English) in which the synthesis will be performed:",
+                                      value="english")
+                lang_av_ct = gr.State(0)
+                gtts_lang_issue = gr.Number(label="Decision", precision=0, visible=False)
                 # tts_cloning = gr.Checkbox(label="") # пока не будем делать раздел с клонированием - проблемно
                 tts_gender = gr.Dropdown(choices=["male", "female"],
                                          label="Which voice gender is preferable?",
@@ -150,6 +155,7 @@ with gr.Blocks() as demo:
                                         visible=False
                                         )
                 API_key_yandex = gr.Textbox(label="Yandex API key", visible=False)
+                speech_progress = gr.Textbox(label="Progress", visible=True)
                 speech_zip_dwld = gr.DownloadButton(label="Download zip with speech", visible=False)
         with gr.Row():
             with gr.Column():
@@ -189,11 +195,13 @@ with gr.Blocks() as demo:
         do_dubbing = gr.Button("START")
         final_btn = gr.DownloadButton("DOWNLOAD RESULT", visible=False)
         # позже снесём это вниз
-        # do_dubbing.click(
-        #     fn=tmf.dummy_func,
-        #     inputs=[],
-        #     outputs=[]
-        # )
+        do_dubbing.click(
+            fn=tmf.make_TTS,
+            inputs=[tts_tool, tts_model, tts_lang, tts_gender, speed_str, srt_upload, tts_voice, tts_role,
+                    API_key_yandex, prompt_upload, prompt_tr_upload],
+            outputs=[speech_zip_dwld]
+        )
+        #tts_tool, model_name, language, gender, speed, srt_uploaded, voice, role, API_key, clone_uploaded = None
     with gr.Tab("Testing TTS"):
         with gr.Row():
             with gr.Column():
@@ -324,6 +332,18 @@ with gr.Blocks() as demo:
         outputs=[tts_gender, tts_voice, tts_role, tts_model, API_key_yandex]
     )
 
+    tts_lang.change(
+        fn=tmf.check_gtts_lang,
+        inputs=tts_lang,
+        outputs=[gtts_lang_issue, lang_av_ct]
+    )
+
+    gtts_lang_issue.change(
+        fn=tmf.check_lang_issue_field,
+        inputs=[gtts_lang_issue, lang_av_ct, tts_lang],
+        outputs=[gtts_lang_issue, tts_lang]
+    )
+
     # ДУБЛЯЖ
     # видимость
     vid_mode.change(
@@ -347,6 +367,14 @@ with gr.Blocks() as demo:
         fn=lambda x: gr.Textbox(visible=x, interactive=x),
         inputs=opt_fragms,
         outputs=timings_str
+    )
+
+    # процесс дубляжа - последовательное выполнение этапов
+    do_dubbing.click(
+        fn=tmf.make_TTS,
+        inputs=[tts_tool, tts_model, tts_lang, tts_gender, speed_str, tts_voice, tts_role,
+                API_key_yandex, srt_upload, prompt_upload, prompt_tr_upload],
+        outputs=[speech_progress, speech_zip_dwld]
     )
 
     #3

@@ -5,13 +5,15 @@ import re
 from pydub import AudioSegment
 from speechkit import model_repository
 
-
 import os
 # from google.colab import files
 import subprocess
 import ffmpeg
+from scipy.io import wavfile
+import numpy as np
+
+
 # import torch
-# import locale # для восстановления кодировки
 # import iso639 # для кодов языков
 # import cv2
 
@@ -80,6 +82,65 @@ def speedup(path, speed):
     os.rename("/content/changed.wav", path)
 
 
+# восстановление кодировки
+def getpreferredencoding(do_setlocale=True):
+    return "UTF-8"
+
+
+def choice_silero_model(lang, gender='female'):
+    ver = '3-4'
+    voice = None  # для тех языков, где нет выбора голосов
+    indic_languages = ['bengali', 'gujarati', 'hindi', 'kannada', 'malayalam',
+                       'manipuri', 'rajasthani', 'tamil', 'telugu']
+
+    if lang == 'russian':
+        model_id = 'v4_ru'
+    elif lang == 'english':
+        model_id = 'v3_en'
+    elif lang == 'german':
+        model_id = 'v3_de'
+    elif lang == 'spanish':
+        model_id = 'v3_es'
+    elif lang == 'french':
+        model_id = 'v3_fr'
+    elif lang == 'bashkir':
+        model_id = 'aigul_v2'
+        ver = '2'
+    elif lang == 'kalmyk':
+        model_id = 'v3_xal'
+    elif lang == 'tatar':
+        model_id = 'v3_tt'
+        voice = 'dilyara'
+    elif lang == 'uzbek':
+        model_id = 'v4_uz'
+        voice = 'dilnavoz'
+    elif lang == 'ukrainian':
+        model_id = 'v4_ua'
+    # индийские языки
+    elif lang in indic_languages:
+        model_id = 'v4_indic'
+        if lang != 'manipuri':
+            voice = lang + '_' + gender
+        else:
+            voice = 'manipuri_female'
+    # кириллические языки
+    else:
+        model_id = 'cyrillic'
+
+    return model_id, voice, ver
+
+
+def silero_save(audio, path, sample_rate):
+    # Преобразуем тензор в массив NumPy
+    audio_np = audio.numpy()
+    # Нормализуем значения массива NumPy к диапазону [-1, 1]
+    audio_np = np.clip(audio_np, -1, 1)
+    # Масштабируем значения к диапазону int16 для сохранения в формате WAV
+    audio_np_int16 = np.int16(audio_np * 32767)
+    # Сохраняем массив NumPy как файл WAV
+    wavfile.write(path, sample_rate, audio_np_int16)
+
+
 # times = [] # для корректировки субтитров в конце
 #
 #
@@ -139,10 +200,6 @@ def speedup(path, speed):
 #     !cp $old_path $aud_path
 #
 #
-# def getpreferredencoding(do_setlocale = True):
-#     return "UTF-8"
-#
-#
 # def video_duration(filename):
 #   video = cv2.VideoCapture(filename)
 #
@@ -181,59 +238,6 @@ def speedup(path, speed):
 #       video = accel_decel(video, video.duration / coef, abruptness = 0)
 #       os.remove(vid_path)
 #       video.write_videofile(vid_path, threads = 4)
-#
-# def choice_silero_model(lang, gender='female'):
-#   ver = '3-4'
-#   voice = None # для тех языков, где нет выбора голосов
-#   indic_languages = ['bengali', 'gujarati', 'hindi', 'kannada', 'malayalam',
-#                      'manipuri', 'rajasthani', 'tamil', 'telugu']
-#
-#   if lang == 'russian':
-#     model_id = 'v4_ru'
-#   elif lang == 'english':
-#     model_id = 'v3_en'
-#   elif lang == 'german':
-#     model_id = 'v3_de'
-#   elif lang == 'spanish':
-#     model_id = 'v3_es'
-#   elif lang == 'french':
-#     model_id = 'v3_fr'
-#   elif lang == 'bashkir':
-#     model_id = 'aigul_v2'
-#     ver = '2'
-#   elif lang == 'kalmyk':
-#     model_id = 'v3_xal'
-#   elif lang == 'tatar':
-#     model_id = 'v3_tt'
-#     voice = 'dilyara'
-#   elif lang == 'uzbek':
-#     model_id = 'v4_uz'
-#     voice = 'dilnavoz'
-#   elif lang == 'ukrainian':
-#     model_id = 'v4_ua'
-#   # индийские языки
-#   elif lang in indic_languages:
-#     model_id = 'v4_indic'
-#     if lang != 'manipuri':
-#       voice = language + '_' + gender
-#     else:
-#       voice = 'manipuri_female'
-#   # кириллические языки
-#   else:
-#     model_id = 'cyrillic'
-#
-#   return model_id, voice, ver
-#
-#
-# def silero_save(audio, path, sample_rate):
-#   # Преобразуем тензор в массив NumPy
-#   audio_np = audio.numpy()
-#   # Нормализуем значения массива NumPy к диапазону [-1, 1]
-#   audio_np = np.clip(audio_np, -1, 1)
-#   # Масштабируем значения к диапазону int16 для сохранения в формате WAV
-#   audio_np_int16 = np.int16(audio_np * 32767)
-#   # Сохраняем массив NumPy как файл WAV
-#   wavfile.write(path, sample_rate, audio_np_int16)
 
 
 # переменные для регулирования процесса загрузки видео и/или аудио
@@ -248,6 +252,8 @@ fish_installed = False
 f5_installed = False
 vm_crtd = False
 vm = None
+xtts_inst = False
+taco_inst = False
 
 path_to_text = 'subtitles.srt'
 path_to_video = 'vid.mp4'
