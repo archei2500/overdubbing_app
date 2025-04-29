@@ -1,5 +1,8 @@
+import os
+os.environ["COQUI_TOS_AGREED"] = "1"
+
 from gtts import gTTS, lang
-#import asyncio
+import asyncio
 import edge_tts
 from edge_tts import VoicesManager
 import TTS_functions as tf
@@ -7,7 +10,6 @@ import iso639
 import gradio as gr
 from pydub import AudioSegment
 from moviepy.editor import VideoFileClip # AudioFileClip, concatenate_videoclips
-import os
 from faster_whisper import WhisperModel
 import shutil
 import torch
@@ -124,6 +126,18 @@ def check_lang_issue_field(lang_num, lang_av_ct, language):
     else:
         lang_arr = [val for val in lang.tts_langs().values() if language.title() in val]
         return [gr.Number(label="Desision", visible=False), gr.Textbox(value=lang_arr[lang_num - 1])]
+
+
+async def run_fish_audio_command(command):
+    """Асинхронный запуск команд Fish Audio"""
+    proc = await asyncio.create_subprocess_exec(
+        *command,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE
+    )
+    stdout, stderr = await proc.communicate()
+    if proc.returncode != 0:
+        raise RuntimeError(f"Command failed: {stderr.decode()}")
 
 
 async def speech_synthesis(tool, model_name, language, gender, speed_str, device, voice, role, API_key, lines):
@@ -257,7 +271,7 @@ async def speech_synthesis(tool, model_name, language, gender, speed_str, device
             raise gr.Error('This language is not supported by Silero Models!')
         # выбор модели
         model_id, speaker, ver = tf.choice_silero_model(language, gender=gender)
-        if not voice and ver == '3-4':
+        if not speaker and ver == '3-4':
             speaker = voice
         model, example_text = torch.hub.load(repo_or_dir='snakers4/silero-models', model='silero_tts',
                                              language=lang_code, speaker=model_id)
@@ -285,14 +299,17 @@ async def speech_synthesis(tool, model_name, language, gender, speed_str, device
         if not (os.path.isfile(tf.clone_sample) and os.path.isfile(tf.clone_text)):
             raise gr.Error('You have not uploaded a voice clone sample and transcript.')
         # загрузка модели
-        subprocess.run(["huggingface-cli", "download", "fishaudio/fish-speech-1.5", "--local-dir",
+        await run_fish_audio_command(["huggingface-cli", "download", "fishaudio/fish-speech-1.5", "--local-dir",
                         "fish-speech/checkpoints/fish-speech-1.5"])
+        # subprocess.run(["huggingface-cli", "download", "fishaudio/fish-speech-1.5", "--local-dir",
+        #                 "fish-speech/checkpoints/fish-speech-1.5"])
         # синтез речи
         # генерация промпта из голоса (fake.npy)
         checkpoint_path_firefly = "fish-speech/checkpoints/fish-speech-1.5/firefly-gan-vq-fsq-8x1024-21hz-generator.pth"
         command = ["python", "fish-speech/fish_speech/models/vqgan/inference.py", "-i", tf.clone_sample,
                    "--checkpoint-path", checkpoint_path_firefly]
-        subprocess.run(command)
+        await run_fish_audio_command(command)
+        #subprocess.run(command)
         # текст промпта
         txt_file = open(tf.clone_text, 'r')
         prompt_text = txt_file.read()
@@ -301,17 +318,19 @@ async def speech_synthesis(tool, model_name, language, gender, speed_str, device
             export_path = tf.path_to_init + '/' + str(int(i / 4)) + '.wav'
             # синтез фразы
             # 1) Generate vocals from semantic tokens
-            prompt_tokens = "fish-speech/fake.npy"
+            prompt_tokens = "fake.npy"
             checkpoint_path = "fish-speech/checkpoints/fish-speech-1.5"
             command = ["python", "fish-speech/fish_speech/models/text2semantic/inference.py", "--text", lines[i+3],
                        "--prompt-text", prompt_text, "--prompt-tokens", prompt_tokens, "--checkpoint-path",
                        checkpoint_path, "--num-samples", "1", "--half"]
-            subprocess.run(command)
+            await run_fish_audio_command(command)
+            #subprocess.run(command)
             # 2) Преобразование вокала из семантических токенов
-            inp = "fish-speech/temp/codes_0.npy"
+            inp = "temp/codes_0.npy"
             command = ["python", "fish-speech/fish_speech/models/vqgan/inference.py", "-i", inp, "--checkpoint-path",
                        checkpoint_path_firefly]
-            subprocess.run(command)
+            await run_fish_audio_command(command)
+            #subprocess.run(command)
             os.rename('fake.wav', export_path)
             if speed != 1:
                 tf.speedup(export_path, speed)
