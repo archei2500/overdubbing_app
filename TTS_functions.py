@@ -8,7 +8,6 @@ from speechkit import model_repository
 import os
 # from google.colab import files
 import subprocess
-import ffmpeg
 from scipy.io import wavfile
 import numpy as np
 
@@ -139,6 +138,13 @@ def silero_save(audio, path, sample_rate):
     audio_np_int16 = np.int16(audio_np * 32767)
     # Сохраняем массив NumPy как файл WAV
     wavfile.write(path, sample_rate, audio_np_int16)
+
+
+def read_srt_file():
+    txtfile = open(path_to_text, 'r', encoding='utf-8')
+    lines = [''] + txtfile.read().split('\n')
+    txtfile.close()
+    return lines
 
 
 # times = [] # для корректировки субтитров в конце

@@ -378,9 +378,7 @@ async def make_TTS(tts_tool, model_name, language, gender, speed, voice, role, A
                 raise gr.Error("You haven't uploaded a text file!")
         if tf.check_txtfile(tf.path_to_text):
             # считываем из файла строки
-            txtfile = open(tf.path_to_text, 'r', encoding='utf-8')
-            lines = [''] + txtfile.read().split('\n')
-            txtfile.close()
+            lines = tf.read_srt_file()
         else:
             raise gr.Error('Incorrect structure of the selected file!')
         device = "cuda" if torch.cuda.is_available() else "cpu"
