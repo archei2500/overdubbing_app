@@ -3,6 +3,7 @@ import os
 import ASR_main_functions as amf
 import TTS_functions as tf
 import TTS_main_functions as tmf
+import Dub_main_functions as dmf
 import iso639
 import torch
 os.environ['XDG_RUNTIME_DIR'] = '/tmp/runtime-user'
@@ -168,6 +169,8 @@ with gr.Blocks() as demo:
                 limit = gr.Checkbox(label="Limit deceleration/acceleration? (for both options)"
                                           "This is necessary so that there is not too much difference between the speeds of phrases or video clips in the final video, if the synthesized phrase is much longer/shorter than the original one.")
                 do_lip_sync = gr.Checkbox(label="do lip sync")
+                dub_progress = gr.Textbox(label="Progress", visible=True)
+                dwnld_vid_fragms = gr.DownloadButton(label="Download zip with cut video fragments", visible=False)
                 dwnld_raw_video = gr.DownloadButton(label="Download raw video (without lip sync)", visible=False)
                 dwnld_new_subs = gr.DownloadButton(label="Download changed subtitles", visible=False)
             with gr.Column():
@@ -375,6 +378,14 @@ with gr.Blocks() as demo:
         inputs=[tts_tool, tts_model, tts_lang, tts_gender, speed_str, tts_voice, tts_role,
                 API_key_yandex, srt_upload, prompt_upload, prompt_tr_upload],
         outputs=[speech_progress, speech_zip_dwld]
+    ).then(
+        fn=dmf.video_cutting,
+        inputs=[file_upload, vid_mode, vid_fragms_upload],
+        outputs=[dub_progress, dwnld_vid_fragms]
+    ).then(
+        fn=dmf.make_dubbing,
+        inputs=[vid_mode, slow_aud, limit, speech_fragms_upload],
+        outputs=[dub_progress, dwnld_new_subs, dwnld_raw_video]
     )
 
     #3

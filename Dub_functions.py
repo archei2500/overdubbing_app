@@ -47,6 +47,8 @@ def check_duration(old_path, aud_path, start, end, slow_aud, limit):
                     if coef >= 0.9:  # замедление будет выполнено, только если аудио не станет медленнее этого значения
                         shutil.copyfile(old_path, aud_path)
                         tf.speedup(aud_path, coef)
+                    else:
+                        add_pause(old_path, aud_path, (duration - len(audio)) / 1000)
                 else:
                     shutil.copyfile(old_path, aud_path)
                     tf.speedup(aud_path, coef)
