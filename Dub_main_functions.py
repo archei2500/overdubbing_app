@@ -11,6 +11,8 @@ from zipfile import ZipFile
 
 
 def video_cutting(vid_uploaded, mode, vid_fragms_uploaded, progress=gr.Progress()):
+    print("WE ARE IN THE...")
+    print(vid_uploaded, mode, vid_fragms_uploaded)
     if not os.path.isfile(tf.path_to_video):
         if vid_uploaded:
             os.rename(vid_uploaded, tf.path_to_video)
@@ -19,6 +21,7 @@ def video_cutting(vid_uploaded, mode, vid_fragms_uploaded, progress=gr.Progress(
 
     if mode == "Stretch/narrow video to fit phrases (takes a lot of time)":
         # создание директорий
+        print("CREATING DIRS")
         if os.path.exists(dfunc.path_to_all):
             shutil.rmtree(dfunc.path_to_all)
             os.makedirs(dfunc.path_to_all)
@@ -39,13 +42,15 @@ def video_cutting(vid_uploaded, mode, vid_fragms_uploaded, progress=gr.Progress(
 
         if not vid_fragms_uploaded:
             if os.path.isfile(tf.path_to_video) and os.path.isfile(tf.path_to_text):
+                print("WE ARE HERE")
                 # считываем из файла строки
                 lines = tf.read_srt_file()
                 # копируем заставку
-                progress(0.1, desc="Copying the screensaver...")
-                command = ["ffmpeg", "-y", "-i", tf.path_to_video, "-to", str(af.str_to_time(lines[2][:lines[2].find(' ')])),
-                           "-async", str(1), "/content/int_fragms/s.mp4"]
-                subprocess.run(command)
+                if af.str_to_time(lines[2][:lines[2].find(' ')]) > 0:
+                    progress(0.1, desc="Copying the screensaver...")
+                    command = ["ffmpeg", "-y", "-i", tf.path_to_video, "-to", str(af.str_to_time(lines[2][:lines[2].find(' ')])),
+                               "-async", str(1), dfunc.path_to_screensaver]
+                    subprocess.run(command)
                 # остальные фрагменты
                 progress(0.2, desc="Copying other fragments...")
                 for i in range(0, len(lines), 4):
@@ -54,23 +59,23 @@ def video_cutting(vid_uploaded, mode, vid_fragms_uploaded, progress=gr.Progress(
                     start = af.str_to_time(lines[i + 2][:lines[i + 2].find(' ')])  # в секундах, float
                     end = af.str_to_time(lines[i + 2][lines[i + 2].rfind(' ') + 1:])
                     # копирование части видео по таймингу
-                    command = ["ffmpeg", "-y", "-i", tf.path_to_video, "-ss", start + 0.001, "-to", end, "-async", str(1),
+                    command = ["ffmpeg", "-y", "-i", tf.path_to_video, "-ss", str(start + 0.001), "-to", str(end), "-async", str(1),
                                out_path1]
                     subprocess.run(command)
                     if i != len(lines) - 4:  # не последний тайминг
                         next_start = af.str_to_time(lines[i + 6][:lines[i + 6].find(' ')])
                         if next_start - end > 0:
-                            command = ["ffmpeg", "-y", "-i", tf.path_to_video, "-ss", end + 0.001, "-to", next_start,
+                            command = ["ffmpeg", "-y", "-i", tf.path_to_video, "-ss", str(end + 0.001), "-to", str(next_start),
                                        "-async", str(1), out_path2]
                             subprocess.run(command)
                     else:
                         if round(dfunc.video_duration(tf.path_to_video), 3) > end:
-                            command = ["ffmpeg", "-y", "-i", tf.path_to_video, "-ss", end + 0.001, "-async", str(1),
+                            command = ["ffmpeg", "-y", "-i", tf.path_to_video, "-ss", str(end + 0.001), "-async", str(1),
                                        out_path2]
                             subprocess.run(command)
                 progress(0.9, desc="Creating zip-archive...")
                 shutil.make_archive(base_name="all_fragments", format="zip", root_dir=dfunc.path_to_all)
-                return [gr.Textbox("Cutting completed."), gr.DownloadButton(visible=True, value="path_to_zip")]
+                return [gr.Textbox("Cutting completed."), gr.DownloadButton(visible=True, value="all_fragments.zip")]
             else:
                 raise gr.Error('It looks like you haven\'t uploaded a video or a text file (or both).')
         else:
@@ -144,7 +149,7 @@ def make_dubbing(mode, slow_aud, limit, speech_fragms_uploaded, progress=gr.Prog
                     vid_path = dfunc.path_to_fragments + '/' + str(int(i / 4)) + '.mp4'
                     pause_path = dfunc.path_to_intermediate + '/' + str(int(i / 4)) + '.mp4'
                     # замедление/ускорение видеофрагмента, если синтезированная фраза длиннее/короче
-                    times = dfunc.check_vid_duration(old_path, vid_path, limit, times)
+                    dfunc.check_vid_duration(old_path, vid_path, limit, times)
                     if os.path.exists(pause_path):  # есть следующий фрагмент видео (тайминги не одинаковые для конца и начала след. фразы)
                         # добавление паузы, равной продолжительности следующего видеофрагмента
                         dfunc.add_pause(old_path, new_path, dfunc.video_duration(pause_path))
@@ -181,7 +186,10 @@ def make_dubbing(mode, slow_aud, limit, speech_fragms_uploaded, progress=gr.Prog
             int_fragms = [dfunc.path_to_intermediate + '/' + item for item in os.listdir(dfunc.path_to_intermediate) if
                           '.ipynb' not in item and 's' not in item]
             int_fragms = sorted(int_fragms, key=dfunc.extract_number)
-            loaded_video_list = [VideoFileClip(dfunc.path_to_intermediate + '/s.mp4')]
+            if os.path.isfile(dfunc.path_to_screensaver):
+                loaded_video_list = [VideoFileClip(dfunc.path_to_intermediate + '/s.mp4')]
+            else:
+                loaded_video_list = []
             for i, vid in enumerate(fragments):
                 loaded_video_list.append(VideoFileClip(vid))
                 next_fragm = dfunc.path_to_intermediate + '/' + str(i) + '.mp4'
@@ -193,6 +201,7 @@ def make_dubbing(mode, slow_aud, limit, speech_fragms_uploaded, progress=gr.Prog
             concatenate_clip.write_videofile(tf.path_to_video, logger=None)
 
             # исправление файла с субтитрами с помощью списка times
+            print("TIIIIIIIIIIIIIIIIIIIIIIIMMES:", times)
             progress(0.7, desc="Creating new subtitles...")
             start_timing = ""
             for i in range(0, len(lines), 4):

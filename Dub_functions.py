@@ -60,22 +60,28 @@ def check_duration(old_path, aud_path, start, end, slow_aud, limit):
         shutil.copyfile(old_path, aud_path)
 
 
+# старое - меняем его
 def check_vid_duration(aud_path, vid_path, limit, times):
     # получение продолжительности видео
     audio = AudioSegment.from_file(aud_path)
     video = VideoFileClip(vid_path).without_audio()
-    times.append(len(audio) / 1000)
-    if abs(len(audio) / 1000 - video.duration) > 0.05:  # аудио короче или длиннее видео на более чем 50 мс
-        coef = round(video.duration / (len(audio) / 1000), 3)
+    audio_duration = len(audio) / 1000
+    vid_duration = video.duration
+    final_duration = vid_duration
+    # times.append(len(audio) / 1000)
+    if abs(audio_duration - vid_duration) > 0.05:  # аудио короче или длиннее видео на более чем 50 мс
+        coef = round(vid_duration / audio_duration, 3)
         if limit:
             # проверка коэффициента, замедление или усорение будет выполнено, только если коэффициент в данных пределах
-            if coef <= 1.1 and coef >= 0.9:
-                video = accel_decel(video, video.duration / coef, abruptness=0)
+            if 1.1 >= coef >= 0.9:
+                print("OH WEEE RE ")
+                video = accel_decel(video, vid_duration / coef, abruptness=0)
                 os.remove(vid_path)
                 video.write_videofile(vid_path, threads=4)
+                final_duration = audio_duration
             else:  # иначе работа с самим аудио
                 if coef > 1:  # если видео собирались ускорить, к аудио добавляем паузу
-                    pause_len = video.duration - (len(audio) / 1000)  # в с
+                    pause_len = vid_duration - audio_duration  # в с
                     add_pause(aud_path, aud_path, pause_len)
                 else:  # если видео собирались замедлить, то ускоряем аудио
                     tf.speedup(aud_path, 1 / coef)
@@ -83,9 +89,41 @@ def check_vid_duration(aud_path, vid_path, limit, times):
                     times.pop()
                     times.append(len(audio) / 1000)
         else:
-            video = accel_decel(video, video.duration / coef, abruptness=0)
+            video = accel_decel(video, vid_duration / coef, abruptness=0)
             os.remove(vid_path)
             video.write_videofile(vid_path, threads=4)
+            final_duration = audio_duration
+    times.append(final_duration)
+
+# def check_vid_duration(aud_path, vid_path, limit):
+#     audio = AudioSegment.from_file(aud_path)
+#     video = VideoFileClip(vid_path).without_audio()
+#     audio_duration = len(audio) / 1000  # Длительность аудио в секундах
+#     video_duration = video.duration  # Длительность видео в секундах
+#
+#     # Проверяем, нужно ли изменять длительность
+#     if abs(audio_duration - video_duration) > 0.05:  # Разница > 50 мс
+#         coef = round(video_duration / audio_duration, 3)
+#
+#         if limit and (coef > 1.1 or coef < 0.9):  # Если ограничение и коэффициент вне диапазона
+#             # Работаем с аудио (добавляем паузу или ускоряем)
+#             if coef > 1:  # Видео длиннее -> добавляем паузу к аудио
+#                 pause_len = video_duration - audio_duration
+#                 add_pause(aud_path, aud_path, pause_len)
+#                 final_duration = video_duration  # После паузы аудио = видео
+#             else:  # Видео короче -> ускоряем аудио
+#                 speedup(aud_path, 1 / coef)
+#                 final_duration = video_duration  # После ускорения аудио = видео
+#         else:  # Либо нет ограничений, либо коэффициент в допустимых пределах
+#             # Меняем скорость видео
+#             video = accel_decel(video, video_duration / coef, abruptness=0)
+#             os.remove(vid_path)
+#             video.write_videofile(vid_path, threads=4)
+#             final_duration = len(AudioSegment.from_file(aud_path)) / 1000  # Новая длительность аудио
+#     else:  # Разница <= 50 мс, ничего не меняем
+#         final_duration = audio_duration
+#
+#     times.append(final_duration)  # Добавляем итоговую длительность
 
 
 def extract_number(s):
