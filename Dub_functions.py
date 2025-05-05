@@ -95,6 +95,7 @@ def check_vid_duration(aud_path, vid_path, limit, times):
             final_duration = audio_duration
     times.append(final_duration)
 
+
 # def check_vid_duration(aud_path, vid_path, limit):
 #     audio = AudioSegment.from_file(aud_path)
 #     video = VideoFileClip(vid_path).without_audio()
@@ -127,11 +128,32 @@ def check_vid_duration(aud_path, vid_path, limit, times):
 
 
 def extract_number(s):
-    match = re.search(r'\d+', s) # регулярное выражение \d+ означает "одна или более цифр подряд"
+    match = re.search(r'\d+', s)  # регулярное выражение \d+ означает "одна или более цифр подряд"
     if match:
         return int(match.group())
     else:
         return 0
+
+
+# for lip sync
+def convert_frames_to_video(path_in, path_out, fps):
+    frame_array = []
+    files = [os.path.join(path_in, f) for f in os.listdir(path_in) if os.path.isfile(os.path.join(path_in, f))]
+    files = sorted(files, key=extract_number)
+
+    size = (10, 10)
+    for file in files:
+        # чтение файлов с кадрами
+        img = cv2.imread(file)
+        height, width, layers = img.shape
+        size = (width, height)
+        # добавление кадров в список изображений
+        frame_array.append(img)
+    out = cv2.VideoWriter(path_out, cv2.VideoWriter_fourcc(*'DIVX'), fps, size)
+    for i in range(len(frame_array)):
+        # запись списка изображений в качестве видео
+        out.write(frame_array[i])
+    out.release()
 
 
 path_to_all = 'all'

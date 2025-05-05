@@ -1,13 +1,15 @@
 import gradio as gr
 import os
 import ASR_main_functions as amf
-import TTS_functions as tf
 import TTS_main_functions as tmf
 import Dub_main_functions as dmf
+import Lip_sync as ls
 import iso639
 import torch
 os.environ['XDG_RUNTIME_DIR'] = '/tmp/runtime-user'
 os.environ['ALSA_CONFIG_PATH'] = '/dev/null'
+import torchvision.transforms.functional as F
+sys.modules['torchvision.transforms.functional_tensor'] = F
 
 path_to_video = 'vid.mp4'
 asr_model_downloaded = False
@@ -195,6 +197,7 @@ with gr.Blocks() as demo:
                 nosmooth = gr.Checkbox(label="nosmooth (To avoid excessive smoothing of the face images)",
                                        value=True,
                                        visible=False)
+                lip_progress = gr.Textbox(label="Lip sync progress", visible=False)
         do_dubbing = gr.Button("START")
         final_btn = gr.DownloadButton("DOWNLOAD RESULT", visible=False)
         # позже снесём это вниз
@@ -360,10 +363,10 @@ with gr.Blocks() as demo:
                       gr.Dropdown(visible=x, interactive=x), gr.Markdown(visible=x),
                       gr.Textbox(visible=x, interactive=x), gr.Textbox(visible=x, interactive=x),
                       gr.Textbox(visible=x, interactive=x), gr.Textbox(visible=x, interactive=x),
-                      gr.Checkbox(visible=x, interactive=x)],
+                      gr.Checkbox(visible=x, interactive=x), gr.Textbox(visible=x)],
         inputs=do_lip_sync,
         outputs=[lip_sync_md, gfpgan, opt_fragms, lip_tool, lip_sync_md2, pad_top, pad_left, pad_right, pad_bottom,
-                 nosmooth]
+                 nosmooth, lip_progress]
     )
 
     opt_fragms.change(
@@ -386,6 +389,10 @@ with gr.Blocks() as demo:
         fn=dmf.make_dubbing,
         inputs=[vid_mode, slow_aud, limit, speech_fragms_upload],
         outputs=[dub_progress, dwnld_new_subs, dwnld_raw_video]
+    ).then(
+        fn=ls.func_lip_sync,
+        inputs=[timings_str, lip_tool, pad_top, pad_left, pad_right, pad_bottom, nosmooth, gfpgan, dwnld_raw_video],
+        outputs=[lip_progress, final_btn]
     )
 
     #3
