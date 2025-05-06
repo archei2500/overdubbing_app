@@ -18,6 +18,8 @@ path_to_lip_res = 'lip_results'
 def func_lip_sync(timings_str, lip_tool, pad_top, pad_left, pad_right, pad_bottom, nosmooth, gfpgan, raw_video):
     if raw_video and os.path.isfile(raw_video):
         tf.path_to_video = raw_video
+        video = VideoFileClip(tf.path_to_video)
+        video.audio.write_audiofile('synt_aud.wav')
     else:
         raise gr.Error("There is no dubbed video!")
 
@@ -133,7 +135,7 @@ def func_lip_sync(timings_str, lip_tool, pad_top, pad_left, pad_right, pad_botto
             vcap1.release()
             vcap2.release()
             out.release()
-            cv2.destroyAllWindows()
+            # cv2.destroyAllWindows()
             print(os.path.isfile(output_file_path))
             os.remove(output_file_path)
             os.rename('resized_video.mp4', output_file_path)
@@ -163,7 +165,7 @@ def func_lip_sync(timings_str, lip_tool, pad_top, pad_left, pad_right, pad_botto
                         else:
                             break
                     vid_stream.release()
-                    cv2.destroyAllWindows()
+                    #cv2.destroyAllWindows()
                     # улучшение кадров
                     command = ["python", "GFPGAN/inference_gfpgan.py", "-i", "vid_frames", "-o", "results", "-v", "1.3",
                                "-s", "1", "--bg_upsampler", "realesrgan"]
@@ -220,7 +222,6 @@ def func_lip_sync(timings_str, lip_tool, pad_top, pad_left, pad_right, pad_botto
         for i, timing in enumerate(timings):
             lip_fragm = path_to_lip_res + "/" + str(i) + '.mp4'
             old_aud = path_to_auds + "/" + str(i) + '.wav'
-            start = 0
             end = af.str_to_time(lines[(timing - 1) * 4 + 2][:lines[(timing - 1) * 4 + 2].find(' ')])
             out_path = 'fragments/' + str(counter) + '.mp4'
             aud_path = 'audios/' + str(counter) + '.wav'
@@ -284,7 +285,7 @@ def func_lip_sync(timings_str, lip_tool, pad_top, pad_left, pad_right, pad_botto
                 counter += 1
                 start = af.str_to_time(lines[(timing - 1) * 4 + 2][lines[(timing - 1) * 4 + 2].rfind(' ') + 1:])
 
-        fragments = ['/content/fragments/' + item for item in os.listdir('/content/fragments') if '.ipynb' not in item]
+        fragments = ['fragments/' + item for item in os.listdir('fragments') if '.ipynb' not in item]
         fragments = sorted(fragments, key=dfunc.extract_number)
 
         loaded_video_list = []
@@ -294,7 +295,7 @@ def func_lip_sync(timings_str, lip_tool, pad_top, pad_left, pad_right, pad_botto
         concatenate_clip = concatenate_videoclips(loaded_video_list, method='compose')
         concatenate_clip.write_videofile('lips_result.mp4', logger=None)
         # Накладываем аудиодорожку
-        command = ["ffmpeg", "-i", "lips_result.mp4", "-i", "aud.wav", "-c:v", "copy", "-c:a", "aac", "-strict",
+        command = ["ffmpeg", "-i", "lips_result.mp4", "-i", "synt_aud.wav", "-c:v", "copy", "-c:a", "aac", "-strict",
                    "experimental", "-map", "0:v:0", "-map", "1:a:0", "final_video.mp4"]
         subprocess.run(command)
 

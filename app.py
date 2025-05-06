@@ -4,12 +4,15 @@ import ASR_main_functions as amf
 import TTS_main_functions as tmf
 import Dub_main_functions as dmf
 import Lip_sync as ls
-import iso639
-import torch
+# import iso639
+# import torch
+# import importlib
 os.environ['XDG_RUNTIME_DIR'] = '/tmp/runtime-user'
 os.environ['ALSA_CONFIG_PATH'] = '/dev/null'
-import torchvision.transforms.functional as F
-sys.modules['torchvision.transforms.functional_tensor'] = F
+# import torchvision.transforms.functional as F
+# sys.modules['torchvision.transforms.functional_tensor'] = F
+# if 'basicsr.data.degradations' in sys.modules:
+#     importlib.reload(sys.modules['basicsr.data.degradations'])
 
 path_to_video = 'vid.mp4'
 asr_model_downloaded = False
@@ -189,11 +192,11 @@ with gr.Blocks() as demo:
                                        visible=False)
                 with gr.Column():
                     lip_sync_md2 = gr.Markdown("Setting the frame around the mouth. This is how the indents are adjusted. You can use the chin area, for example, by setting pad bottom = 20.", visible=False)
-                    pad_top = gr.Textbox(label="pad top", visible=False)
+                    pad_top = gr.Number(label="pad top", visible=False, value=0, precision=0)
                     with gr.Row():
-                        pad_left = gr.Textbox(label="pad left", visible=False)
-                        pad_right = gr.Textbox(label="pad right", visible=False)
-                    pad_bottom = gr.Textbox(label="pad bottom", visible=False)
+                        pad_left = gr.Number(label="pad left", visible=False, value=0, precision=0)
+                        pad_right = gr.Number(label="pad right", visible=False, value=0, precision=0)
+                    pad_bottom = gr.Number(label="pad bottom", visible=False, value=0, precision=0)
                 nosmooth = gr.Checkbox(label="nosmooth (To avoid excessive smoothing of the face images)",
                                        value=True,
                                        visible=False)
