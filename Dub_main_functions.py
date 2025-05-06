@@ -233,6 +233,7 @@ def make_dubbing(mode, slow_aud, limit, speech_fragms_uploaded, progress=gr.Prog
             if len(lines) != 1:
                 txt_file.write(lines[-1])
             txt_file.close()
+            tf.path_to_text = dfunc.subs_path  # нужно будет для lip sync, чтобы при чтении уже был новый файл
 
         # добавление в начало аудиодорожки заставки на случай, если она была музыкальной
         if os.path.isfile(dfunc.path_to_screensaver):

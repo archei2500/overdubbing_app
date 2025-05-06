@@ -15,13 +15,16 @@ path_to_vids = 'vid_fragms'
 path_to_lip_res = 'lip_results'
 
 
-def func_lip_sync(timings_str, lip_tool, pad_top, pad_left, pad_right, pad_bottom, nosmooth, gfpgan, raw_video):
+def func_lip_sync(timings_str, lip_tool, pad_top, pad_left, pad_right, pad_bottom, nosmooth, gfpgan, raw_video,
+                  progress=gr.Progress()):
     if raw_video and os.path.isfile(raw_video):
         tf.path_to_video = raw_video
         video = VideoFileClip(tf.path_to_video)
         video.audio.write_audiofile('synt_aud.wav')
     else:
         raise gr.Error("There is no dubbed video!")
+
+    lines = tf.read_srt_file()
 
     if timings_str:
         try:
@@ -30,13 +33,10 @@ def func_lip_sync(timings_str, lip_tool, pad_top, pad_left, pad_right, pad_botto
         except ValueError:
             raise gr.Error("You entered the fragment numbers incorrectly.")
     else:
-        raise gr.Error("You must enter the fragment numbers!")
-
-    lines = tf.read_srt_file()
-    print(lines)
+        timings = [n + 1 for n in range(int(len(lines) / 4))]
 
     # проверка на принадлежность существующему диапазону таймингов, введённых пользователем
-    if timings[0] >= 1 and timings[-1] <= len(lines) / 4:
+    if timings[0] >= 1 and timings[-1] <= int(len(lines) / 4):
         # создание папок для хранения аудио- и видеофрагментов
         if os.path.exists(path_to_auds):
             shutil.rmtree(path_to_auds)
@@ -50,6 +50,7 @@ def func_lip_sync(timings_str, lip_tool, pad_top, pad_left, pad_right, pad_botto
             os.makedirs(path_to_vids, exist_ok=True)
 
         # из видео вырезаются фрагменты для анимации губ
+        progress(0.1, desc="Fragments are being cut out...")
         for i, timing in enumerate(timings):
             start = af.str_to_time(lines[(timing - 1) * 4 + 2][:lines[(timing - 1) * 4 + 2].find(' ')])
             end = af.str_to_time(lines[(timing - 1) * 4 + 2][lines[(timing - 1) * 4 + 2].rfind(' ') + 1:])
@@ -85,6 +86,7 @@ def func_lip_sync(timings_str, lip_tool, pad_top, pad_left, pad_right, pad_botto
         checkpoint_path = 'checkpoints/wav2lip.pth' if lip_tool == 'Wav2Lip' else 'checkpoints/wav2lip_gan.pth'
 
         # синхронизация губ
+        progress(0.2, desc="Lip synchronization...")
         for i, lip_fragm in enumerate(lip_fragments_list):
             print("SYNCRONISEEEE")
             output_file_path = path_to_lip_res + '/' + str(i) + '.mp4'
@@ -141,6 +143,7 @@ def func_lip_sync(timings_str, lip_tool, pad_top, pad_left, pad_right, pad_botto
             os.rename('resized_video.mp4', output_file_path)
 
         if gfpgan:
+            progress(0.4, desc="Using GFPGAN...")
             os.makedirs("results", exist_ok=True)
             os.makedirs("results_videos", exist_ok=True)
             os.makedirs("results_mp4_videos", exist_ok=True)
@@ -208,6 +211,7 @@ def func_lip_sync(timings_str, lip_tool, pad_top, pad_left, pad_right, pad_botto
                 shutil.copyfile(new_lip_fragm, lip_fragm)
 
         # Итоговая нарезка
+        progress(0.8, desc="Final cutting...")
         counter = 0
         if os.path.exists("fragments"):
             shutil.rmtree("fragments")
@@ -288,6 +292,7 @@ def func_lip_sync(timings_str, lip_tool, pad_top, pad_left, pad_right, pad_botto
         fragments = ['fragments/' + item for item in os.listdir('fragments') if '.ipynb' not in item]
         fragments = sorted(fragments, key=dfunc.extract_number)
 
+        progress(0.9, desc="Combining fragments...")
         loaded_video_list = []
         # склеиваем все фрагменты
         for fragment in fragments:
@@ -298,9 +303,9 @@ def func_lip_sync(timings_str, lip_tool, pad_top, pad_left, pad_right, pad_botto
         command = ["ffmpeg", "-i", "lips_result.mp4", "-i", "synt_aud.wav", "-c:v", "copy", "-c:a", "aac", "-strict",
                    "experimental", "-map", "0:v:0", "-map", "1:a:0", "final_video.mp4"]
         subprocess.run(command)
+        progress(1.0, desc="Done!")
 
         return [gr.Textbox(visible=False), gr.DownloadButton(visible=True, value="final_video.mp4")]
-
     else:
         err_str = "You have uploaded a file that contains " + str(
             int(len(lines) / 4)) + " segments, but entered " + timings_str
